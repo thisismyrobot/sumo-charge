@@ -81,22 +81,6 @@ class CommandSet(object):
     def __getattr__(self, key):
         return self.data[key]
 
-ISO14443A = CommandSet('ISO14443A', {
-    'Request':          0x03,
-    'Anticollision':    0x04,
-    'Select':           0x05,
-    'Halt':             0x06,
-    'Transfer':         0x28,
-})
-
-ISO14443B = CommandSet('ISO14443B', {
-    'Request':          0x09,
-    'Anticollision':    0x0A,
-    'Attrib':           0x0B,
-    'Rst':              0x0C,
-    'Transfer':         0x0D,
-})
-
 Mifare = CommandSet('Mifare', {
     'Read':             0x20,
     'Write':            0x21,
@@ -117,23 +101,6 @@ System = CommandSet('System', {
     'Control_Led1':     0x87,
     'Control_Led2':     0x88,
     'Control_Buzzer':   0x89,
-})
-
-ISO15693 = CommandSet('ISO15693', {
-    'Inventory':        0x10,
-    'Read':             0x11,
-    'Write':            0x12,
-    'Lockblock':        0x13,
-    'StayQuiet':        0x14,
-    'Select':           0x15,
-    'Resetready':       0x16,
-    'Write_AFI':        0x17,
-    'Lock_AFI':         0x18,
-    'Write_DSFID':      0x19,
-    'Lock_DSFID':       0x1A,
-    'Get_Information':  0x1B,
-    'Get_Multiple_Block_Security': 0x1C,
-    'Transfer':         0x1D,
 })
 
 Status = {
