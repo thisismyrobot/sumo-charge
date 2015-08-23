@@ -53,7 +53,9 @@ if __name__ == '__main__':
     def rfid_thread():
         while True:
             # If tag detected and we're not already charging, start charging
+            # in 5 seconds.
             if rfid.serial() != [] and not CHARGING:
+                time.sleep(5)
                 start_charging(pifacedigital)
             time.sleep(1)
     threading.Thread(target=rfid_thread).start()
