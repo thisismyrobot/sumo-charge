@@ -6,5 +6,5 @@ picamera==1.10
 pifacecommon==4.1.2
 pifacedigitalio==3.0.4
 pygobject==3.8.2
-pyserial==2.5
+pyserial>=2.6
 wsgiref==0.1.2
