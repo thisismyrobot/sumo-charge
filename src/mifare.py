@@ -16,27 +16,4 @@ class RFID(object):
     def serial(self):
         """ Return a serial number as a list of integers.
         """
-
-
-
-
-# Get the first USB COM port and open it
-try:
-    port = (p[0]
-            for p
-            in serial.tools.list_ports.comports() if 'USB' in p[1]).next()
-except StopIteration:
-    sys.stderr.write('No USB COM ports!')
-    sys.exit(1)
-
-try:
-    io = serial.Serial(port, 9600, timeout=1)
-except:
-    sys.stderr.write('Failed to open \'{}\'!'.format(port))
-    sys.exit(1)
-
-
-
-# Set up the module-level function
-def read():
-    return r.execute(io).data
+        return self._packet.execute(self._io).data
