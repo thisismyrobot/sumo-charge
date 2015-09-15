@@ -45,25 +45,28 @@ def snapshot(ip_addr, listen_port, width=160, height=120, timeout=1):
     server_thread.start()
 
     # Connect to the sumo and request the image
-    tconn = telnetlib.Telnet(ip_addr)
-    tconn.read_until('[JS] $', 1)
-    tconn.write('kill `pidof dragon-prog`2>/dev/null\n')
-    tconn.write(
-        ' '.join((
-            'yavta',
-            '--skip=1',
-            '-s{}x{}'.format(width, height),
-            '-c2',
-            '-S{}:{}'.format(my_ip, listen_port),
-            '-fMJPEG',
-            '/dev/video0',
-        )) + '>/dev/null\n'
-    )
+    try:
+        tconn = telnetlib.Telnet(ip_addr, timeout=timeout)
+        tconn.read_until('[JS] $z', 1)
+        tconn.write('kill `pidof dragon-prog`2>/dev/null\n')
+        tconn.write(
+            ' '.join((
+                'yavta',
+                '--skip=1',
+                '-s{}x{}'.format(width, height),
+                '-c2',
+                '-S{}:{}'.format(my_ip, listen_port),
+                '-fMJPEG',
+                '/dev/video0',
+            )) + '>/dev/null\n'
+        )
+    except socket.timeout:
+        raise Exception('Failed to conect to Jumping Sumo and request image.')
 
     # Wait on image being recieved
     server_thread.join(timeout)
     if server_thread.isAlive():
-        raise Exception('No image recieved from Jumping Sumo')
+        raise Exception('No image recieved from Jumping Sumo.')
 
     return img_data[0]
 
