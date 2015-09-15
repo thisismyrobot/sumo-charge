@@ -47,7 +47,7 @@ def snapshot(ip_addr, listen_port, width=160, height=120, timeout=1):
     # Connect to the sumo and request the image
     try:
         tconn = telnetlib.Telnet(ip_addr, timeout=timeout)
-        tconn.read_until('[JS] $z', 1)
+        tconn.read_until('[JS] $', 1)
         tconn.write('kill `pidof dragon-prog`2>/dev/null\n')
         tconn.write(
             ' '.join((
