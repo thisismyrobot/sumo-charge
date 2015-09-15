@@ -11,7 +11,7 @@ LISTEN_PORT = 49999
 
 
 def snapshot(ip_addr, listen_port, width=160, height=120, timeout=1):
-    """ Returns raw jpeg data from Parrot jumping sumo.
+    """ Returns raw JPEG data from Parrot jumping sumo.
     """
 
     # Determine my IP address on the interface connected to the sumo
@@ -61,12 +61,12 @@ def snapshot(ip_addr, listen_port, width=160, height=120, timeout=1):
             )) + '>/dev/null\n'
         )
     except socket.timeout:
-        raise Exception('Failed to conect to Jumping Sumo and request image.')
+        raise Exception('Failed to connect to Jumping Sumo and request image.')
 
-    # Wait on image being recieved
+    # Wait on image being received
     server_thread.join(timeout)
     if server_thread.isAlive():
-        raise Exception('No image recieved from Jumping Sumo.')
+        raise Exception('No image received from Jumping Sumo.')
 
     return img_data[0]
 
