@@ -10,7 +10,7 @@ PARROT_IP = '192.168.2.1'
 LISTEN_PORT = 49999
 
 
-def snapshot(ip_addr, listen_port, width=160, height=120):
+def snapshot(ip_addr, listen_port, width=160, height=120, timeout=1):
     """ Returns raw jpeg data from Parrot jumping sumo.
     """
 
@@ -47,21 +47,23 @@ def snapshot(ip_addr, listen_port, width=160, height=120):
     # Connect to the sumo and request the image
     tconn = telnetlib.Telnet(ip_addr)
     tconn.read_until('[JS] $', 1)
-    tconn.write('kill `pidof dragon-prog`\n')
+    tconn.write('kill `pidof dragon-prog`2>/dev/null\n')
     tconn.write(
         ' '.join((
             'yavta',
             '--skip=1',
-            '--size={}x{}'.format(width, height),
-            '--capture=2',
-            '--send={}:{}'.format(my_ip, listen_port),
-            '--format=MJPEG',
+            '-s{}x{}'.format(width, height),
+            '-c2',
+            '-S{}:{}'.format(my_ip, listen_port),
+            '-fMJPEG',
             '/dev/video0',
-        )) + '\n'
+        )) + '>/dev/null\n'
     )
 
     # Wait on image being recieved
-    server_thread.join()
+    server_thread.join(timeout)
+    if server_thread.isAlive():
+        raise Exception('No image recieved from Jumping Sumo')
 
     return img_data[0]
 
