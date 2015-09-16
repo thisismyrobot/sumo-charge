@@ -15,16 +15,16 @@ def snapshot(ip_addr, width=160, height=120, timeout=1):
     try:
         tconn = telnetlib.Telnet(ip_addr, timeout=timeout)
         tconn.read_until('[JS] $ ')
-        tconn.write('kill `pidof dragon-prog` 2> /dev/null\n')
+        tconn.write('kill `pidof dragon-prog`\r\n')
         tconn.read_until('[JS] $ ')
         tconn.write(
             ' '.join((
                 'echo \'\' > /dev/stdout',
                 ';',
                 'yavta',
-                '--skip=2',
+                '--skip=1',
                 '-s{}x{}'.format(width, height),
-                '-c1',
+                '-c2',
                 '-F/dev/stdout',
                 '-fMJPEG',
                 '/dev/video0',
@@ -40,7 +40,7 @@ def snapshot(ip_addr, width=160, height=120, timeout=1):
         '[JS] $ '
     ).split('base64 /dev/stdout')[1].replace('\r\n', '')[:-7]
 
-    return base64.b64decode(res)
+    return base64.b64decode(res)[1:]
 
 
 if __name__ == '__main__':
