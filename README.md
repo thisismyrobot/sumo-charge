@@ -22,6 +22,11 @@ Pi and some bits and bobs. This will hopefully allow for hands-free docking.
 ## Software
 
  * Raspbian on the Pi
+
+ * Python deps:
+
+    pip install -r requirements.txt
+
  * Python QR tools:
 
     sudo apt-get install python-qrtools
