@@ -24,7 +24,7 @@ def snapshot_ftp(ip_addr=PARROT_IP, timeout=1):
             'mkdir -p /data/ftp/ram',
             'umount /data/ftp/ram',
             'mount -t tmpfs -o size=1m tmpfs /data/ftp/ram',
-            'yavta --skip=1 -c2 -n1 -F/data/ftp/ram/snap.jpg /dev/video0 > /dev/null'
+            'yavta --skip=21 -c22 -n1 -F/data/ftp/ram/snap.jpg /dev/video0 > /dev/null'
         )) + '\r\n'
         tconn.write(cmd)
     except socket.timeout:
