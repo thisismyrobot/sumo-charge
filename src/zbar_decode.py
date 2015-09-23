@@ -53,7 +53,15 @@ def xy(zbar_loc, width, height):
     return x_percent, y_percent
 
 
+def width(zbar_loc):
+    """ Returns width of QR code.
+    """
+    left_side  = (zbar_loc[0][0] + zbar_loc[1][0]) / 2
+    right_side = (zbar_loc[2][0] + zbar_loc[3][0]) / 2
+    return right_side - left_side
+
+
 if __name__ == '__main__':
     with open(sys.argv[-1], 'rb') as imgf:
         for (code, size, location) in codes(imgf.read()):
-            print code, xy(location, *size)
+            print xy(location, *size), width(location)
