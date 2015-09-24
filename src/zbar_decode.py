@@ -39,8 +39,8 @@ def xy(zbar_loc, width, height):
 
     """
     # Locate the centre of the QR code
-    x_px = sum(map(operator.itemgetter(0), zbar_loc)) / 4.0
-    y_px = sum(map(operator.itemgetter(1), zbar_loc)) / 4.0
+    x_px = sum(map(operator.itemgetter(0), zbar_loc)) / len(zbar_loc)
+    y_px = sum(map(operator.itemgetter(1), zbar_loc)) / len(zbar_loc)
 
     # Locate that centre based on 0,0 being the centre of the image
     x_coord = (x_px - (width / 2))
