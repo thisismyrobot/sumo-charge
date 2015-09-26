@@ -4,9 +4,6 @@
 #     Copyright(C) 2015, Isao Hara, AIST
 #     Release under the MIT License.
 #
-
-import sys
-import os
 import socket
 import select
 import time
@@ -35,32 +32,32 @@ class SocketAdaptor(threading.Thread):
         self.mainloop = False
         self.debug = False
         self.locl = threading.Lock()
-        if typ :
-         self.socktype = socket.SOCK_STREAM
+        if typ:
+            self.socktype = socket.SOCK_STREAM
         else:
-         self.socktype = socket.SOCK_DGRAM
+            self.socktype = socket.SOCK_DGRAM
     #
     #
     #
     def setHost(self, name):
         self.host = name
-        return 
+        return
 
     def setPort(self, port):
         self.port = port
-        return 
+        return
 
     def setType(self, typ):
         self.socktype = typ
-        return 
+        return
 
     def setClientMode(self):
         self.client_adaptor = True
-        return 
+        return
 
     def setServerMode(self):
         self.client_adaptor = False
-        return 
+        return
     #
     # Bind
     #
@@ -74,7 +71,7 @@ class SocketAdaptor(threading.Thread):
             self.close()
             return 0
         except:
-            print "Error in bind " , self.host, self.port
+            print "Error in bind ", self.host, self.port
             self.close()
             return -1
 
@@ -84,7 +81,7 @@ class SocketAdaptor(threading.Thread):
     # Connect
     #
     def connect(self, async=True):
-        if self.mainloop :
+        if self.mainloop:
             return 1
 
         try:
@@ -97,12 +94,12 @@ class SocketAdaptor(threading.Thread):
             return 0
 
         except:
-            print "Error in connect " , self.host, self.port
+            print "Error in connect ", self.host, self.port
             self.close()
             return -1
 
-        if async :
-            print "Start read thread ",self.name
+        if async:
+            print "Start read thread ", self.name
             self.start()
 
         return 1
@@ -112,10 +109,10 @@ class SocketAdaptor(threading.Thread):
     #
     def wait_for_read(self, timeout=0.1):
         try:
-            rready, wready, xready = select.select([self.socket],[],[], timeout)
+            rready, wready, xready = select.select([self.socket], [], [], timeout)
 
-            if len(rready) :
-#                print "Ready to read:",self.name
+            if len(rready):
+#                print "Ready to read:", self.name
                 return 1
             return 0
         except:
@@ -129,12 +126,12 @@ class SocketAdaptor(threading.Thread):
     def receive_data(self, bufsize=8192, timeout=1.0):
         data = None
         try:
-            if self.wait_for_read(timeout) == 1    :
+            if self.wait_for_read(timeout) == 1:
                 data = self.socket.recv(bufsize)         # buffer size = 1024 * 8
                 if len(data) != 0:
                     return data
                 else:
-                    return    -1
+                    return -1
 
         except socket.error:
             print "socket.error in receive_data"
@@ -154,18 +151,18 @@ class SocketAdaptor(threading.Thread):
                 self.reader.clearBuffer()
                 return None
 
-            else :
+            else:
                 self.reader.appendBuffer(data)
-                if self.reader.bufsize >= bufsize :
+                if self.reader.bufsize >= bufsize:
                     data1 = self.reader.read(bufsize, 1)
                     self.reader.parser.setBuffer(data1)
                     return data1
                 else:
 #                    print    "Size %d, %d" % (self.reader.bufsize, bufsize )
                     pass
-            
+
         return None
-        
+
     #
     #
     #
@@ -179,7 +176,7 @@ class SocketAdaptor(threading.Thread):
         threading.Thread.start(self)
 
     def run(self):
-        if self.client_adaptor: 
+        if self.client_adaptor:
             self.message_receiver()
         else:
             self.accept_service_loop()
@@ -191,12 +188,12 @@ class SocketAdaptor(threading.Thread):
         try:
             conn, addr = self.socket.accept()
             self.service_id += 1
-            name = self.name+":service:%d" % self.service_id
+            name = self.name + ":service:%d" % self.service_id
             reader = copy.copy(self.reader)
             newadaptor = SocketAdaptor(self.reader, name, addr[0], addr[1])
             newadaptor.socket = conn
             self.service.append(newadaptor)
-            if flag :
+            if flag:
                 newadaptor.start()
             return newadaptor
         except:
@@ -207,63 +204,63 @@ class SocketAdaptor(threading.Thread):
     def wait_accept_service(self, timeout=5, runflag=True):
         print "Wait for accept %d sec.: %s(%s:%d)" % (timeout, self.name, self.host, self.port)
         self.socket.listen(1)
-        res = self.wait_for_read(timeout) 
+        res = self.wait_for_read(timeout)
         if res == 1:
             return self.accept_service(runflag)
         else:
-            pass 
+            pass
         return None
 
     def accept_service_loop(self, lno=5, timeout=1.0):
         print "Wait for accept: %s(%s:%d)" % (self.name, self.host, self.port)
         self.socket.listen(lno)
         while self.mainloop:
-            res = self.wait_for_read(timeout) 
+            res = self.wait_for_read(timeout)
             if res == 1:
                 self.accept_service()
             elif res == -1:
                 self.terminate()
             else:
                 pass
-        
+
         print "Terminate all service %s(%s:%d)" % (self.name, self.host, self.port)
         self.close_service()
         self.close()
-        return 
+        return
     #
     #    Background job ( message receiver )
     #
     def message_receiver(self):
         while self.mainloop:
-            data = self.receive_data() 
+            data = self.receive_data()
 
-            if data    == -1:
+            if data == -1:
                 self.terminate()
 
-            elif data :
+            elif data:
                 if self.reader:
                     self.reader.parse(data)
                 else:
                     print data
 
-            elif data is None :
+            elif data is None:
                 pass
 
-            else :
-                print "Umm...:",self.name
+            else:
+                print "Umm...:", self.name
                 print data
 
-        print "Read thread terminated:",self.name
+        print "Read thread terminated:", self.name
 
     #
     #    close socket
     #
     def close_service(self):
-        for s in    self.service :
+        for s in self.service:
             s.terminate()
 
     def close(self):
-        if self.socket :
+        if self.socket:
             self.socket.close()
             self.socket = None
     #
@@ -276,7 +273,7 @@ class SocketAdaptor(threading.Thread):
     #    Send message
     #
     def send(self, msg):
-        if not self.socket :
+        if not self.socket:
             print "Error: Not connected"
             return None
         try:
@@ -294,9 +291,9 @@ class SocketAdaptor(threading.Thread):
 class SumoSender(SocketAdaptor):
     def __init__(self, owner, myip="localhost", port=0):
         if owner:
-            SocketAdaptor.__init__(self, None, owner.name+"Out", myip, port, False) 
+            SocketAdaptor.__init__(self, None, owner.name+"Out", myip, port, False)
         else:
-            SocketAdaptor.__init__(self, None, "DebugOut", myip, port, False) 
+            SocketAdaptor.__init__(self, None, "DebugOut", myip, port, False)
         self.parser = SumoMarshaller()
         self.move_seq = 1
         self.ioctl_seq = 1
@@ -313,23 +310,23 @@ class SumoSender(SocketAdaptor):
 
     def mkcmd1(self, klass, func, param):
         self.parser.initCommand('\x02\x0b\x00\x0f\x00\x00\x00\x03')
-        self.parser.marshal('bHI',klass, func, param)
+        self.parser.marshal('bHI', klass, func, param)
 
-        self.parser.setSeqId(self.cmd_seq )
-        self.cmd_seq = (self.cmd_seq + 1 ) % 256
+        self.parser.setSeqId(self.cmd_seq)
+        self.cmd_seq = (self.cmd_seq + 1) % 256
 
         return self.parser.getEncodedCommand()
 
     def posture(self, param):
 # param = enum[standing, jumper, kicker]
-        cmd = self.mkcmd1(0, 1,param)
+        cmd = self.mkcmd1(0, 1, param)
 #        print[cmd]
         self.cmd_activate = True
         self.send(cmd)
         self.cmd_activate = False
 
     def action(self, param):
-# param = enum[stop, spin, tap, slowshake, metronome, oudulation, spinjump, spintoposture, spiral,slalom]
+# param = enum[stop, spin, tap, slowshake, metronome, oudulation, spinjump, spintoposture, spiral, slalom]
         cmd = self.mkcmd1(2, 4, param)
 #        print[cmd]
         self.cmd_activate = True
@@ -350,18 +347,18 @@ class SumoSender(SocketAdaptor):
         self.move_counter = counter
 
     def move_cmd(self):
-        if self.move_counter == 0 :
-            self.mv_speed = 0 
-            self.mv_turn    = 0
+        if self.move_counter == 0:
+            self.mv_speed = 0
+            self.mv_turn = 0
 
         self.parser.initCommand('\x02\x0a\x00\x0e\x00\x00\x00\x03\x00\x00\x00')
-        if self.mv_speed == 0 and self.mv_turn == 0 :
+        if self.mv_speed == 0 and self.mv_turn == 0:
             self.parser.marshal('bbb', 0, 0, 0)
         else:
             self.parser.marshal('bbb', 1, self.mv_speed, self.mv_turn)
 
-        self.parser.setSeqId(self.move_seq )
-        self.move_seq = (self.move_seq + 1 ) % 256
+        self.parser.setSeqId(self.move_seq)
+        self.move_seq = (self.move_seq + 1) % 256
 
         return self.parser.getEncodedCommand()
 
@@ -369,18 +366,18 @@ class SumoSender(SocketAdaptor):
         self.parser.initCommand('\x04\x0b\x00\x16\x00\x00\x00\x04\x01\x00')
         self.parser.marshal('S', datetime.date.today().isoformat())
 
-        self.parser.setSeqId(self.ioctl_seq )
-        self.ioctl_seq = (self.ioctl_seq + 1 ) % 256
+        self.parser.setSeqId(self.ioctl_seq)
+        self.ioctl_seq = (self.ioctl_seq + 1) % 256
 
         return self.parser.getEncodedCommand()
 
     def time_sync(self):
         self.parser.initCommand('\x04\x0b\x00\x16\x00\x00\x00\x04\x02\x00')
-        now=datetime.datetime.now()
+        now = datetime.datetime.now()
         self.parser.marshal('S', now.strftime('T%H%M%S000'))
 
-        self.parser.setSeqId(self.ioctl_seq )
-        self.ioctl_seq = (self.ioctl_seq + 1 ) % 256
+        self.parser.setSeqId(self.ioctl_seq)
+        self.ioctl_seq = (self.ioctl_seq + 1) % 256
 
         return self.parser.getEncodedCommand()
 
@@ -412,12 +409,13 @@ class SumoSender(SocketAdaptor):
 class SumoReceiver(SocketAdaptor):
     def __init__(self, owner, host, port):
         if owner:
-            SocketAdaptor.__init__(self, SumoCommReader(owner), owner.name+"In", host, port, False) 
+            SocketAdaptor.__init__(self, SumoCommReader(owner), owner.name+"In", host, port, False)
         else:
-            SocketAdaptor.__init__(self, SumoCommReader(owner), "DebugIn", host, port, False) 
+            SocketAdaptor.__init__(self, SumoCommReader(owner), "DebugIn", host, port, False)
 
     def bind(self):
-        if SocketAdaptor.bind(self) != 1 : return -1
+        if SocketAdaptor.bind(self) != 1:
+            return -1
         self.port = self.socket.getsockname()[1]
         return self.port
 
@@ -429,13 +427,13 @@ class SumoReaderBase:
     def __init__(self, owner=None, parser=None):
         self.buffer = ""
         self.bufsize = 0
-        self.current=0
+        self.current = 0
         self.owner = owner
         if parser is None:
             self.parser = SumoMarshaller('')
         else:
             self.parser = parser
- 
+
         self.dataHandler = None
         if owner is None:
             self.debug = True
@@ -448,7 +446,7 @@ class SumoReaderBase:
     def parse(self, data):
         if self.debug:
             print data
-        self.appendBuffer( data )
+        self.appendBuffer(data)
 
     #
     #    Usually 'owner' is a controller
@@ -460,10 +458,11 @@ class SumoReaderBase:
     #    Buffer
     #
     def setBuffer(self, buffer):
-        if self.buffer : del self.buffer
-        self.buffer=buffer
+        if self.buffer:
+            del self.buffer
+        self.buffer = buffer
         self.bufsize = len(buffer)
-        self.current=0
+        self.current = 0
 
     def appendBuffer(self, buffer):
         self.buffer += buffer
@@ -471,24 +470,25 @@ class SumoReaderBase:
 
     def skipBuffer(self, n=4, flag=1):
         self.current += n
-        if flag :
+        if flag:
             self.buffer = self.buffer[self.current:]
             self.current = 0
-        return 
+        return
 
     def clearBuffer(self, n=0):
-        if n > 0 :
+        if n > 0:
 #            self.printPacket( self.buffer[:n] )
             self.buffer = self.buffer[n:]
             self.current = 0
         else:
-            if self.buffer : del self.buffer
+            if self.buffer:
+                del self.buffer
             self.buffer = ""
             self.current = 0
 
     def checkBuffer(self):
         try:
-            if len(self.buffer) > self.current :
+            if len(self.buffer) > self.current:
                 res = self.parser.checkMsgFormat(self.buffer, self.current)
                 if res > 0:
                     return res
@@ -498,27 +498,27 @@ class SumoReaderBase:
         except:
             print "ERR in checkBuffer"
             self.printPacket(self.buffer)
-            self.buffer=""
+            self.buffer = ""
             pass
 
         return 0
-         
+
     #
-    #    extract data from self.buffer 
+    #    extract data from self.buffer
     #
     def read(self, nBytes, delFlag=1):
         start = self.current
         end = start + nBytes
 
-        if self.bufsize < end :
+        if self.bufsize < end:
             end = self.bufsize
 
         data = self.buffer[start:end]
         self.current = end
 
-        if    delFlag :
-            self.buffer =    self.buffer[end:]
-            self.current =    0
+        if    delFlag:
+            self.buffer = self.buffer[end:]
+            self.current = 0
         return data
 
     #
@@ -533,7 +533,7 @@ class SumoReaderBase:
 class SumoCommReader(SumoReaderBase):
     def __init__(self, owner=None, parser=None):
         SumoReaderBase.__init__(self, owner, parser)
-    
+
     def parse(self, data):
         SumoReaderBase.parse(self, data)
         self.process()
@@ -544,7 +544,7 @@ class SumoCommReader(SumoReaderBase):
         if size > 0:
             data = self.read(size)
             self.printPacket(data)
-            
+
         return
 
 #
@@ -552,23 +552,24 @@ class SumoCommReader(SumoReaderBase):
 #
 class SumoMarshaller:
     def __init__(self, buffer=''):
-        self.buffer=buffer
+        self.buffer = buffer
         self.bufsize = len(buffer)
 
-        self.offset=0
+        self.offset = 0
 
         self.header_size = self.calcsize('BBBHH')
-        self.encbuf=None
-        self.encpos=0
+        self.encbuf = None
+        self.encpos = 0
 
     #
     #    for buffer
     #
     def setBuffer(self, buffer):
-        if self.buffer : del self.buffer
-        self.buffer=buffer
-        self.bufsize=len(buffer)
-        self.offset=0
+        if self.buffer:
+            del self.buffer
+        self.buffer = buffer
+        self.bufsize = len(buffer)
+        self.offset = 0
 
     def clearBuffer(self):
         self.setBuffer("")
@@ -578,14 +579,14 @@ class SumoMarshaller:
         self.bufsize = len(self.buffer)
 
     #
-    #    check message format...    
+    #    check message format...
     #
     def checkMsgFormat(self, buffer, offset=0):
         bufsize = len(buffer)
 
         if bufsize - offset >= self.header_size:
-            self.buffer=buffer
-            self.offset=offset
+            self.buffer = buffer
+            self.offset = offset
             (cmd, func, seq, size, fid) = self.unmarshal('bbbHH')
 
             if cmd in (0x01, 0x02, 0x03, 0x04):
@@ -605,15 +606,16 @@ class SumoMarshaller:
     # extract message from buffer
     #
     def getMessage(self, buffer=None, offset=0):
-        if buffer: self.buffer = buffer
-        res =    self.checkMsgFormat(self.buffer, offset)
+        if buffer:
+            self.buffer = buffer
+        res = self.checkMsgFormat(self.buffer, offset)
 
         if res > 0:
-            start = offset 
-            end =    offset + res
+            start = offset
+            end = offset + res
             cmd = self.buffer[start:end]
-            self.buffer =    self.buffer[end:]
-            self.offset =    0
+            self.buffer = self.buffer[end:]
+            self.offset = 0
             return cmd
 
         elif res == 0:
@@ -628,52 +630,53 @@ class SumoMarshaller:
     #
     def skipBuffer(self):
             print "call skipBuffer"
-            return 
+            return
     #
     #    print buffer for debug
     #
     def printPacket(self, data):
         for x in data:
-            print "0x%02x" % ord(x), 
+            print "0x%02x" % ord(x),
         print
 
     #
     #    dencoding data
-    # 
+    #
     def unmarshalString(self, offset=-1):
-        if offset < 0 : offset=self.offset
+        if offset < 0: offset=self.offset
         try:
-         endpos = self.buffer.index('\x00', offset)
-         size = endpos - offset
-         if(size > 0):
-             (str_res,) =    struct.unpack_from('!%ds' % (size), self.buffer, offset)
-             self.offset += size + 1
-             return str_res 
-         else:
-             return ""
+            endpos = self.buffer.index('\x00', offset)
+            size = endpos - offset
+            if(size > 0):
+                (str_res,) = struct.unpack_from('!%ds' % (size), self.buffer, offset)
+                self.offset += size + 1
+                return str_res
+            else:
+                return ""
         except:
             print "Error in parseCommand"
             return None
 
     def unmarshalNum(self, fmt, offset=-1):
-        if offset < 0 : offset=self.offset
+        if offset < 0:
+            offset = self.offset
         try:
-         (res,) =    struct.unpack_from(fmt, self.buffer, offset)
-         self.offset = offset + struct.calcsize(fmt)
-         return res
+            (res,) = struct.unpack_from(fmt, self.buffer, offset)
+            self.offset = offset + struct.calcsize(fmt)
+            return res
         except:
             print "Error in unmarshalNum"
             return None
-         
+
     def unmarshalUShort(self, offset=-1):
         return self.unmarshalNum('<H', offset)
-         
+
     def unmarshalUInt(self, offset=-1):
         return self.unmarshalNum('<I', offset)
-         
+
     def unmarshalDouble(self, offset=-1):
         return self.unmarshalNum('d', offset)
-         
+
     def unmarshalBool(self, offset=-1):
         return self.unmarshalNum('B', offset)
 
@@ -684,7 +687,7 @@ class SumoMarshaller:
         return self.unmarshalNum('c', offset)
 
     def unmarshal(self, fmt):
-        res=[]
+        res = []
         for x in fmt:
             if x in ('i', 'h', 'I', 'H'):
                 res.append(self.unmarshalNum('<'+x))
@@ -697,16 +700,16 @@ class SumoMarshaller:
     #    generate command
     #
     def createCommand(self):
-        self.encbuf=bytearray()
-        self.encpos=0 
+        self.encbuf = bytearray()
+        self.encpos = 0
 
     def initCommand(self, cmd):
-        self.encbuf=bytearray(cmd)
-        self.encpos=len(cmd) 
+        self.encbuf = bytearray(cmd)
+        self.encpos = len(cmd)
 
     def appendCommand(self, cmd):
         self.encbuf = self.encbuf + bytearray(cmd)
-        self.encpos += len(cmd) 
+        self.encpos += len(cmd)
 
     def setCommandSize(self):
         size = len(self.encbuf)
@@ -724,14 +727,15 @@ class SumoMarshaller:
         return str(self.encbuf)
 
     def clearEncodedCommand(self):
-        if self.encbuf : del self.encbuf
-        self.encbuf=None
+        if self.encbuf:
+            del self.encbuf
+        self.encbuf = None
         return
     #
     #    encoding data
-    # 
+    #
     def marshalNumericData(self, fmt, s):
-        enc_code = bytearray( struct.calcsize(fmt))
+        enc_code = bytearray(struct.calcsize(fmt))
         struct.pack_into(fmt, enc_code, 0, s)
         self.encbuf = self.encbuf+enc_code
         self.encpos += struct.calcsize(fmt)
@@ -752,20 +756,20 @@ class SumoMarshaller:
         self.marshalNumericData('>d', d)
 
     def marshalBool(self, d):
-        if d :
+        if d:
             self.marshalNumericData('B', 1)
-        else :
+        else:
             self.marshalNumericData('B', 0)
 
     def marshalByte(self, d):
             self.marshalNumericData('b', d)
 
     def marshalString(self, str):
-        size=len(str)
-        enc_size = size+1
-        enc_code = bytearray( size )
+        size = len(str)
+        enc_size = size + 1
+        enc_code = bytearray(size)
 
-        if size > 0 :
+        if size > 0:
             struct.pack_into('%ds' % (size,), enc_code, 0, str)
 
         self.encbuf = self.encbuf+enc_code+'\x00'
@@ -776,18 +780,18 @@ class SumoMarshaller:
         for x in fmt:
             if x in ('i', 'h', 'I', 'H', 'd'):
                 self.marshalNumericData('<'+x, data[pos])
-            elif x    == 'b':
+            elif x == 'b':
                 self.marshalByte(data[pos])
-            elif x    == 'B':
+            elif x == 'B':
                 self.marshalBool(data[pos])
-            elif x    == 'c':
+            elif x == 'c':
                 self.marshalChar(data[pos])
             elif x == 'S':
                 self.marshalString(data[pos])
             elif x == 's':
                 self.marshalString(data[pos], 0)
             pos += 1
-        return 
+        return
 
     def calcsize(self, fmt):
         res = 0
@@ -795,17 +799,18 @@ class SumoMarshaller:
             if x in ('i', 'h', 'I', 'H', 'd', 'B'):
                 res += struct.calcsize(x)
             else:
-                print "Unsupported format:",x
+                print "Unsupported format:", x
         return res
 
     #
     #    print encoded data for debug
     #
     def printEncoded(self):
-        count=0
+        count = 0
         for x in self.encbuf:
             print "0x%02x" % x,
-            if count % 8 == 7 : print
+            if count % 8 == 7:
+                print
             count += 1
         print
 
@@ -815,24 +820,26 @@ class SumoMarshaller:
 #
 class SumoController:
     def __init__(self, name, host="192.168.2.1"):
-        self.name=name
-        self.host=host
-        self.initport=44444
-        self.recvport=0
-        self.sendport=54321
-        self.config={}
+        self.name = name
+        self.host = host
+        self.initport = 44444
+        self.recvport = 0
+        self.sendport = 54321
+        self.config = {}
 
         myip = getipaddr(host, 0xffffff00)
-        self.init_sock = SocketAdaptor(None, name, host, self.initport) 
-        self.receiver = SumoReceiver(self, myip, self.recvport) 
-        self.sender = SumoSender(self, host, self.sendport) 
+        self.init_sock = SocketAdaptor(None, name, host, self.initport)
+        self.receiver = SumoReceiver(self, myip, self.recvport)
+        self.sender = SumoSender(self, host, self.sendport)
 
     def connect(self):
-        if self.receiver.bind() < 0 : return -1
+        if self.receiver.bind() < 0:
+            return -1
         self.recvport = self.receiver.port
-        if self.init_sock.connect(False) != 1 : return -1
+        if self.init_sock.connect(False) != 1:
+            return -1
 
-        init_msg={}
+        init_msg = {}
         init_msg["controller_name"] = self.name
         init_msg["controller_type"] = "Python"
         init_msg["d2c_port"] = self.recvport
@@ -840,12 +847,12 @@ class SumoController:
         self.init_sock.send(json.dumps(init_msg))
         res = self.init_sock.receive_data()
 
-        if res and res != -1: 
+        if res and res != -1:
             self.config = json.loads(res[:len(res)-1])
             self.sendport = self.config["c2d_port"]
-            self.sender.setPort(self.sendport) 
+            self.sender.setPort(self.sendport)
             self.init_sock.terminate()
-            self.sender.connect(False) 
+            self.sender.connect(False)
         else:
             print "Fail to connect"
             self.init_sock.terminate()
@@ -880,8 +887,8 @@ class SumoController:
 # Global Functions...
 #
 def ip2hex(ipstr):
-    ipar=ipstr.split('.')
-    return int(ipar[0]) << 48 |int(ipar[1]) << 32 | int(ipar[2]) << 16 |int(ipar[3])
+    ipar = ipstr.split('.')
+    return int(ipar[0]) << 48 | int(ipar[1]) << 32 | int(ipar[2]) << 16 | int(ipar[3])
 
 def ipcomp(ip1, ip2, msk=0xffffff00):
     iph1 = ip2hex(ip1) & msk
@@ -891,7 +898,6 @@ def ipcomp(ip1, ip2, msk=0xffffff00):
 def getipaddr(ip, msk=0xffffff00):
     ips = socket.gethostbyname_ex(socket.gethostname())[2]
     for x in ips:
-        if ipcomp(x, ip, msk) :
+        if ipcomp(x, ip, msk):
             return x
     return socket.gethostbyname(socket.gethostname())
-
