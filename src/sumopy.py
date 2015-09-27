@@ -29,17 +29,19 @@ class SumoController(object):
         # Strip trailing \x00.
         init_resp = init_sock.recv(1024)[:-1]
 
+        print init_resp
+
         return json.loads(init_resp)['c2d_port']
 
     def _send(self, cmd):
         """ Send via the c2d_port.
         """
-        print '> ', repr(cmd)
+        print '>', repr(cmd)
         self._c2d_sock.sendall(cmd)
         self._sequence = (self._sequence + 1) % 256
 
     @staticmethod
-    def fab_cmd(seq, project, _class, cmd, *args):
+    def fab_cmd(ack, seq, project, _class, cmd, *args):
         """ Assemble the bytes for a command.
 
             Most values from:
@@ -58,9 +60,9 @@ class SumoController(object):
         """
         arr = bytearray()
 
-        # Type: no ACK (for now). 4 = ACK I think. See <..."buffer="NON_ACK">
-        # in XML.
-        arr.append(2)
+        # Type: 2 = No ACK, 4 = ACK I think. See <..."buffer="NON_ACK"> in
+        # XML.
+        arr.append(ack)
 
         # Channel - 10 is for sending commands.
         arr.append(10)
@@ -103,6 +105,7 @@ class SumoController(object):
 
     def move(self, speed, turn=0):
         cmd = SumoController.fab_cmd(
+            2,  # No ACK
             self._sequence,
             3,  # Jumping Sumo project id = 3
             0,  # Piloting = Class ID 0
