@@ -39,33 +39,53 @@ class SumoController(object):
         self._sequence = (self._sequence + 1) % 256
 
     @staticmethod
-    def fab_cmd(class_id, seq, idx, *args):
+    def fab_cmd(seq, project, _class, cmd, *args):
+        """ Assemble the bytes for a command.
+
+            Most values from:
+                https://github.com/Parrot-Developers/libARCommands/blob/master/Xml/common_commands.xml
+
+            class_id:
+                From "<class name="Common" id="[id]">" in Xml.
+
+            seq:
+                Incrementing command sequence number (0-255).
+
+            idx:
+                Index (zero-based) of the command in the Xml.
+
+            https://github.com/Zepheus/ardrone3-pcap/blob/master/README.md
+        """
         arr = bytearray()
 
-        # Class Id?
-        arr.append(class_id)
+        # Type: no ACK (for now). 4 = ACK I think. See <..."buffer="NON_ACK">
+        # in XML.
+        arr.append(2)
 
-        # boilerplate?
-        arr.append(0xa)
+        # Channel - 10 is for sending commands.
+        arr.append(10)
 
-        # Sequence number
+        # Sequence number - 0-255
         arr.append(seq)
 
-        # boilerplate?
-        arr.append(0)  # becomes total length
+        # Message length - we update this at end.
         arr.append(0)
-        arr.append(0)
-        arr.append(0)
-
-        # count of args?
-        arr.append(len(args))
 
         # boilerplate?
         arr.append(0)
         arr.append(0)
+        arr.append(0)
+
+        # Project ID - Jumping Sumo = 3
+        arr.append(project)
+
+        arr.append(0)
+
+        # Class ID
+        arr.append(_class)
 
         # Command index?
-        arr.append(idx)
+        arr.append(cmd)
 
         # arguments
         map(arr.append, args)
@@ -83,8 +103,9 @@ class SumoController(object):
 
     def move(self, speed, turn=0):
         cmd = SumoController.fab_cmd(
-            2,  # Class 2?
             self._sequence,
+            3,  # Jumping Sumo project id = 3
+            0,  # Piloting = Class ID 0
             0,  # Command index 0 = PCMD
             1,  # Touch screen = yes
             speed,  # -100 -> 100 %
@@ -97,6 +118,7 @@ class SumoController(object):
 
 
 if __name__ == '__main__':
+
     controller = SumoController()
     controller.connect()
     controller.move(20)
