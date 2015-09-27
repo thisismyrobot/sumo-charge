@@ -2,6 +2,7 @@
 """
 import json
 import socket
+import time
 
 
 class SumoController(object):
@@ -30,6 +31,13 @@ class SumoController(object):
 
         return json.loads(init_resp)['c2d_port']
 
+    def _send(self, cmd):
+        """ Send via the c2d_port.
+        """
+        print '> ', repr(cmd)
+        self._c2d_sock.sendall(cmd)
+        self._sequence = (self._sequence + 1) % 256
+
     @staticmethod
     def fab_cmd(class_id, seq, idx, *args):
         arr = bytearray()
@@ -57,7 +65,7 @@ class SumoController(object):
         arr.append(0)
 
         # Command index?
-        arr.append(cmd_idx)
+        arr.append(idx)
 
         # arguments
         map(arr.append, args)
@@ -75,15 +83,14 @@ class SumoController(object):
 
     def move(self, speed, turn=0):
         cmd = SumoController.fab_cmd(
-            2,  # Class?
+            2,  # Class 2?
             self._sequence,
-            0,  # Command index 0
+            0,  # Command index 0 = PCMD
             1,  # Touch screen = yes
             speed,  # -100 -> 100 %
             turn,  # -100 -> 100 = -360 -> 360 degrees
         )
-        self._c2d_sock.sendall(cmd)
-        self._sequence = (self._sequence + 1) % 256
+        self._send(cmd)
 
     def stop(self):
         self.move(0, 0)
@@ -92,41 +99,6 @@ class SumoController(object):
 if __name__ == '__main__':
     controller = SumoController()
     controller.connect()
-
-#    c2d_port = controller._c2d_port
-
-#    print c2d_port
-
-    # Params
-    class_id = 2
-    cmd_seq = 255
-    cmd_idx = 0
-    touch_screen = 1
-    speed = 10
-    turn = 0  # 25 = 90 degrees
-
-    # Target code
-    import sumo
-    cmd = '\x02\x0a\x00\x0e\x00\x00\x00\x03\x00\x00\x00'
-    marshaller = sumo.SumoMarshaller()
-    marshaller.initCommand(cmd)
-    if speed == 0 and turn == 0:
-        marshaller.marshal('bbb', 0, 0, 0)
-    else:
-        marshaller.marshal('bbb', touch_screen, speed, turn)
-    marshaller.setSeqId(cmd_seq)
-    data2 = marshaller.getEncodedCommand()
-    print 'original:', repr(data2)
-
-    # New code
-    data = SumoController.fab_cmd(class_id, cmd_seq, cmd_idx, touch_screen, speed, turn)
-    print 'new:     ', repr(data)
-
-    controller.move(speed, turn)
-    import time; time.sleep(0.1)
+    controller.move(20)
+    time.sleep(0.1)
     controller.stop()
-
-    # Send it!
-#    c2d_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#    c2d_sock.connect(('192.168.2.1', 54321))
-#    c2d_sock.sendall(data)
