@@ -16,6 +16,7 @@ RECV_MAX = 10240
 
 BOT_C2DPORT = None
 BOT_D2CPORT = None
+CONTROLLER_D2CPORT = None
 CONTROLLER_IP = None
 
 
@@ -40,14 +41,22 @@ class InitHandler(SocketServer.BaseRequestHandler):
     """
     def handle(self):
         global BOT_C2DPORT
+        global CONTROLLER_D2CPORT
         global BOT_D2CPORT
         global CONTROLLER_IP
 
         data = self.request.recv(RECV_MAX)
         print '>', repr(data)
 
-        BOT_D2CPORT = json.loads(data[:-1])['d2c_port']
+        json_data = json.loads(data[:-1])
+
+        CONTROLLER_D2CPORT = json_data['d2c_port']
+        BOT_D2CPORT = CONTROLLER_D2CPORT + 1
         CONTROLLER_IP = self.client_address[0]
+
+        # Reconstruct the data with the new D2C Port
+        json_data['d2c_port'] = BOT_D2CPORT
+        data = json.dumps(json_data) + '\x00'
 
         bot_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         bot_socket.connect((BOT_IP, BOT_INIT_PORT))
@@ -65,7 +74,7 @@ class C2D_UDPHandler(SocketServer.BaseRequestHandler):
     """ SocketServer handler for data to bot from controller.
     """
     def handle(self):
-        data = self.request[0].strip()
+        data = self.request[0]
         print '>', repr(data)
 
         bot_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -76,11 +85,11 @@ class D2C_UDPHandler(SocketServer.BaseRequestHandler):
     """ SocketServer handler for data to controller from bot.
     """
     def handle(self):
-        data = self.request[0].strip()
+        data = self.request[0]
         print '<', repr(data)
 
         controller_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        controller_socket.sendto(data, (CONTROLLER_IP, BOT_D2CPORT))
+        controller_socket.sendto(data, (CONTROLLER_IP, CONTROLLER_D2CPORT))
 
 
 if __name__ == '__main__':
@@ -96,14 +105,17 @@ if __name__ == '__main__':
     threading.Thread(target=init_server.serve_forever).start()
 
     # Wait on getting a port info
-    while CONTROLLER_IP is None or BOT_C2DPORT is None or BOT_D2CPORT is None:
+    print 'Waiting for INIT...'
+    while CONTROLLER_IP is None or BOT_C2DPORT is None or BOT_D2CPORT is None or CONTROLLER_D2CPORT is None:
         time.sleep(0.01)
 
     # Handle data from controller to the bot
+    print 'Listening for C2D data on {}'.format(BOT_C2DPORT)
     c2d_udp_server = SocketServer.UDPServer(('', BOT_C2DPORT), C2D_UDPHandler)
     threading.Thread(target=c2d_udp_server.serve_forever).start()
 
     # Handle data back from the bot to the controller
+    print 'Listening for D2C data on {}'.format(BOT_D2CPORT)
     d2c_udp_server = SocketServer.UDPServer(('', BOT_D2CPORT), D2C_UDPHandler)
     d2c_udp_server.serve_forever()
 
