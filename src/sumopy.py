@@ -29,19 +29,19 @@ class SumoController(object):
         # Strip trailing \x00.
         init_resp = init_sock.recv(1024)[:-1]
 
-        print init_resp
+#        print init_resp
 
         return json.loads(init_resp)['c2d_port']
 
     def _send(self, cmd):
         """ Send via the c2d_port.
         """
-        print '>', repr(cmd)
+#        print '>', repr(cmd)
         self._c2d_sock.sendall(cmd)
         self._sequence = (self._sequence + 1) % 256
 
     @staticmethod
-    def fab_cmd(ack, seq, project, _class, cmd, *args):
+    def fab_cmd(ack, channel, seq, project, _class, cmd, *args):
         """ Assemble the bytes for a command.
 
             Most values from:
@@ -64,8 +64,8 @@ class SumoController(object):
         # XML.
         arr.append(ack)
 
-        # Channel - 10 is for sending commands.
-        arr.append(10)
+        # Channel - 10 is for sending commands. 11 for photo trigger?
+        arr.append(channel)
 
         # Sequence number - 0-255
         arr.append(seq)
@@ -76,12 +76,10 @@ class SumoController(object):
         # boilerplate?
         arr.append(0)
         arr.append(0)
-        arr.append(0)
 
         # Project ID - Jumping Sumo = 3
-        arr.append(project)
-
         arr.append(0)
+        arr.append(project)
 
         # Class ID
         arr.append(_class)
@@ -91,6 +89,9 @@ class SumoController(object):
 
         # arguments
         map(arr.append, args)
+
+        # Trailing 0x00
+        arr.append(0)
 
         # update message length value
         arr[3] = len(arr)
@@ -106,6 +107,7 @@ class SumoController(object):
     def move(self, speed, turn=0):
         cmd = SumoController.fab_cmd(
             2,  # No ACK
+            10, # Piloting channel
             self._sequence,
             3,  # Jumping Sumo project id = 3
             0,  # Piloting = Class ID 0
@@ -116,14 +118,56 @@ class SumoController(object):
         )
         self._send(cmd)
 
+    def pic(self):
+        cmd = SumoController.fab_cmd(
+            4,  # No ACK
+            11, # Media channel ?
+            self._sequence,
+            3,  # Jumping Sumo project id = 3
+            6,  # class = MediaRecord
+            0,  # Command = Picture (offset 0)
+            0,  # Internal storage = 0
+        )
+        self._send(cmd)
+
     def stop(self):
         self.move(0, 0)
 
 
 if __name__ == '__main__':
 
+    print repr('\x02\n\x07\x0e\x00\x00\x00\x03\x00\x00\x00\x01\x14\x02')
+    print repr(
+        SumoController.fab_cmd(
+            2,  # No ACK
+            10,  # Piloting channel
+            7,  # Sequence
+            3,  # Jumping Sumo project id = 3
+            0,  # Class 0 = Piloting
+            0,  # Command = PCMD (offset 0)
+            1,  # Touch screen = yes
+            20,  # -100 -> 100 %
+            2,  # -100 -> 100 = -360 -> 360 degrees
+        )
+    )
+
+    print repr('\x04\x0b\x07\x0c\x00\x00\x00\x03\x06\x00\x00\x00')
+    print repr(
+        SumoController.fab_cmd(
+            4,  # No ACK
+            11,  # Media channel ?
+            7,  # Sequence
+            3,  # Jumping Sumo project id = 3
+            6,  # Class 6 = MediaRecord
+            0,  # Command = Picture (offset 0)
+            0,  # Internal storage = 0
+        )
+    )
+
+
     controller = SumoController()
     controller.connect()
     controller.move(20)
+    controller.pic()
     time.sleep(0.1)
     controller.stop()
