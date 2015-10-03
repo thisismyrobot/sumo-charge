@@ -10,12 +10,13 @@ class SumoController(object):
     """
     def __init__(self, ip='192.168.2.1', init_port=44444, debug=False):
         self._ip = ip
-        self._init_port = init_port
-        self._connected = False
         self._sequence = 1
         self._debug = debug
 
-    def _get_c2dport(self, d2c_port=54321):
+        self._c2d_port = self._get_c2dport(init_port)
+        self._c2d_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def _get_c2dport(self, init_port, d2c_port=54321):
         """ Return the ports we need to connect to for control.
         """
         init_msg = {
@@ -24,13 +25,11 @@ class SumoController(object):
             'd2c_port': d2c_port,
         }
         init_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        init_sock.connect((self._ip, self._init_port))
+        init_sock.connect((self._ip, init_port))
         init_sock.sendall(json.dumps(init_msg))
 
         # Strip trailing \x00.
         init_resp = init_sock.recv(1024)[:-1]
-
-#        print init_resp
 
         return json.loads(init_resp)['c2d_port']
 
@@ -39,7 +38,7 @@ class SumoController(object):
         """
         if self._debug:
             print '>', SumoController.hex_repr(cmd)
-        self._c2d_sock.sendall(cmd)
+        self._c2d_sock.sendto(cmd, (self._ip, self._c2d_port))
         self._sequence = (self._sequence + 1) % 256
 
     @staticmethod
@@ -104,16 +103,12 @@ class SumoController(object):
     def hex_repr(prstr):
         return ''.join('\\x{:02x}'.format(ord(c)) for c in prstr)
 
-    def connect(self):
-        c2d_port = self._get_c2dport()
-        self._c2d_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._c2d_sock.connect((self._ip, c2d_port))
-        self._connected = True
-
     def move(self, speed, turn=0):
+        """ Move.
+        """
         cmd = SumoController.fab_cmd(
             2,  # No ACK
-            10,  # Piloting channel
+            10,  # Piloting channel?
             self._sequence,
             3,  # Jumping Sumo project id = 3
             0,  # Piloting = Class ID 0
@@ -125,8 +120,10 @@ class SumoController(object):
         self._send(cmd)
 
     def pic(self):
+        """ Take a pic to internal storage - use FTP to retrieve if you want.
+        """
         cmd = SumoController.fab_cmd(
-            4,  # No ACK
+            4,  # ACK
             11,  # Media channel ?
             self._sequence,
             3,  # Jumping Sumo project id = 3
@@ -137,13 +134,14 @@ class SumoController(object):
         self._send(cmd)
 
     def stop(self):
+        """ Stopping is fairly simple...
+        """
         self.move(0, 0)
 
 
 if __name__ == '__main__':
 
     controller = SumoController(debug=True)
-    controller.connect()
     controller.move(20)
     controller.pic()
     time.sleep(0.1)
