@@ -2,6 +2,7 @@
 """
 import json
 import socket
+import struct
 import time
 
 
@@ -42,7 +43,7 @@ class SumoController(object):
         self._sequence = (self._sequence + 1) % 256
 
     @staticmethod
-    def fab_cmd(ack, channel, seq, project, _class, cmd, *args):
+    def fab_cmd(ack, channel, seq, project, _class, cmd, args):
         """ Assemble the bytes for a command.
 
             Most values from:
@@ -91,8 +92,8 @@ class SumoController(object):
         # Padded 0x00
         arr.append(0)
 
-        # arguments
-        map(arr.append, args)
+        # arguments, pre-packed using struct
+        arr += args
 
         # update message length value
         arr[3] = len(arr)
@@ -113,9 +114,12 @@ class SumoController(object):
             3,  # Jumping Sumo project id = 3
             0,  # Piloting = Class ID 0
             0,  # Command index 0 = PCMD
-            1,  # Touch screen = yes
-            speed,  # -100 -> 100 %
-            turn,  # -100 -> 100 = -360 -> 360 degrees
+            struct.pack(
+                '<Bbb',  # u8, i8, i8
+                1,  # Touch screen = yes
+                speed,   # -100 -> 100 %
+                turn,    # -100 -> 100 = -360 -> 360 degrees
+            )
         )
         self._send(cmd)
 
@@ -129,7 +133,10 @@ class SumoController(object):
             3,  # Jumping Sumo project id = 3
             6,  # class = MediaRecord
             0,  # Command = Picture (offset 0)
-            0,  # Internal storage = 0
+            struct.pack(
+                '<B',  # u8
+                0,  # Internal storage = 0
+            )
         )
         self._send(cmd)
 
@@ -142,7 +149,11 @@ class SumoController(object):
 if __name__ == '__main__':
 
     controller = SumoController(debug=True)
-    controller.move(20)
+    controller.move(100)
+    time.sleep(0.2)
+    controller.stop()
     controller.pic()
-    time.sleep(0.1)
+    time.sleep(0.2)
+    controller.move(-100)
+    time.sleep(0.2)
     controller.stop()
