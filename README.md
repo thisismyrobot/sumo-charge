@@ -32,3 +32,7 @@ Pi and some bits and bobs. This will hopefully allow for hands-free docking.
     sudo apt-get install python-qrtools
 
  * TBD...
+
+## Hat tips
+
+ * Heaps of pointers toward the byte format for commands: https://github.com/haraisao/JumpingSumo-Python
