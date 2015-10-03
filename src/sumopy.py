@@ -8,11 +8,12 @@ import time
 class SumoController(object):
     """ Parrot Jumping Sumo controller.
     """
-    def __init__(self, ip='192.168.2.1', init_port=44444):
+    def __init__(self, ip='192.168.2.1', init_port=44444, debug=False):
         self._ip = ip
         self._init_port = init_port
         self._connected = False
         self._sequence = 1
+        self._debug = debug
 
     def _get_c2dport(self, d2c_port=54321):
         """ Return the ports we need to connect to for control.
@@ -36,7 +37,8 @@ class SumoController(object):
     def _send(self, cmd):
         """ Send via the c2d_port.
         """
-#        print '>', repr(cmd)
+        if self._debug:
+            print '>', SumoController.hex_repr(cmd)
         self._c2d_sock.sendall(cmd)
         self._sequence = (self._sequence + 1) % 256
 
@@ -87,16 +89,20 @@ class SumoController(object):
         # Command index?
         arr.append(cmd)
 
+        # Padded 0x00
+        arr.append(0)
+
         # arguments
         map(arr.append, args)
-
-        # Trailing 0x00
-        arr.append(0)
 
         # update message length value
         arr[3] = len(arr)
 
         return str(arr)
+
+    @staticmethod
+    def hex_repr(prstr):
+        return ''.join('\\x{:02x}'.format(ord(c)) for c in prstr)
 
     def connect(self):
         c2d_port = self._get_c2dport()
@@ -107,7 +113,7 @@ class SumoController(object):
     def move(self, speed, turn=0):
         cmd = SumoController.fab_cmd(
             2,  # No ACK
-            10, # Piloting channel
+            10,  # Piloting channel
             self._sequence,
             3,  # Jumping Sumo project id = 3
             0,  # Piloting = Class ID 0
@@ -121,7 +127,7 @@ class SumoController(object):
     def pic(self):
         cmd = SumoController.fab_cmd(
             4,  # No ACK
-            11, # Media channel ?
+            11,  # Media channel ?
             self._sequence,
             3,  # Jumping Sumo project id = 3
             6,  # class = MediaRecord
@@ -136,36 +142,7 @@ class SumoController(object):
 
 if __name__ == '__main__':
 
-    print repr('\x02\n\x07\x0e\x00\x00\x00\x03\x00\x00\x00\x01\x14\x02')
-    print repr(
-        SumoController.fab_cmd(
-            2,  # No ACK
-            10,  # Piloting channel
-            7,  # Sequence
-            3,  # Jumping Sumo project id = 3
-            0,  # Class 0 = Piloting
-            0,  # Command = PCMD (offset 0)
-            1,  # Touch screen = yes
-            20,  # -100 -> 100 %
-            2,  # -100 -> 100 = -360 -> 360 degrees
-        )
-    )
-
-    print repr('\x04\x0b\x07\x0c\x00\x00\x00\x03\x06\x00\x00\x00')
-    print repr(
-        SumoController.fab_cmd(
-            4,  # No ACK
-            11,  # Media channel ?
-            7,  # Sequence
-            3,  # Jumping Sumo project id = 3
-            6,  # Class 6 = MediaRecord
-            0,  # Command = Picture (offset 0)
-            0,  # Internal storage = 0
-        )
-    )
-
-
-    controller = SumoController()
+    controller = SumoController(debug=True)
     controller.connect()
     controller.move(20)
     controller.pic()
