@@ -1,10 +1,10 @@
 """ Charge-starting code for Parrot Jumping Sumo.
 """
 import pifacedigitalio
-import mifare
+import sumocharge.mifare
 import threading
 import time
-import usb_serial
+import sumocharge.usb_serial
 
 
 # Will look at looping back the digital outs to some "ins" to detect this...
@@ -45,10 +45,10 @@ if __name__ == '__main__':
     pifacedigital = pifacedigitalio.PiFaceDigital()
 
     # We need a usb serial port - the one with RFID connected would be great.
-    io = usb_serial.first()
+    io = sumocharge.usb_serial.first()
 
     # Set up the RFID reader loop
-    rfid = mifare.RFID(io)
+    rfid = sumocharge.mifare.RFID(io)
 
     def rfid_thread():
         while True:

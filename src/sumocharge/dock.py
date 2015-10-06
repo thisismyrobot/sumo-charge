@@ -1,8 +1,8 @@
 """ Simple docking example.
 """
-import get_frame
+import sumocharge.sumopy
+import sumocharge.zbar_decode
 import telnetlib
-import zbar_decode
 
 
 # Close the main process
@@ -11,13 +11,15 @@ tconn.read_until('[JS] $ ')
 tconn.write('pkill `pidof dragon-prog`\r\n')
 
 
+conn = sumocharge.sumopy.SumoController()
+
 while True:
 
     # Capture a pic, as a starting point.
-    start_pic = get_frame.snapshot_ftp()
-    start_info = [zbar_decode.xy(location, *size)[0]
+    start_pic = conn.get_pic()
+    start_info = [sumocharge.zbar_decode.xy(location, *size)[0]
                   for (code, size, location)
-                  in zbar_decode.codes(start_pic)
+                  in sumocharge.zbar_decode.codes(start_pic)
                   if code == '0']
 
     # Default to forwards
