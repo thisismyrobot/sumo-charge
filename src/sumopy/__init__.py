@@ -3,8 +3,9 @@
 import json
 import socket
 import struct
+import threading
 import time
-
+import SocketServer
 
 DEFAULT_IP = '192.168.2.1'
 
@@ -153,6 +154,42 @@ class SumoController(object):
         )
         self._send(cmd)
 
+    def get_pic(self):
+        """ Take a pic to internal storage and return it.
+
+            This isn't very quick (~2 seconds/pic), but it is reliable.
+        """
+        # Create a UDP handler
+        expected_sequence = int(self._sequence)
+        server = None
+        class UDPHandler(SocketServer.BaseRequestHandler):
+            """ SocketServer handler for data to controller from bot.
+            """
+            def handle(self):
+                def tidy():
+                    """ Threadable server shutdown.
+                    """
+                    server.shutdown()
+                    server.server_close()
+                data = self.request[0]
+
+                # Wait on the acknowledgement of the photo
+                if data.startswith('\x02\x00{}'.format(chr(expected_sequence))):
+                    threading.Thread(target=tidy).start()
+
+        # Create a listening UDP socket.
+        server = SocketServer.UDPServer(('', 54321), UDPHandler)
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.start()
+
+        # Ask for a photo
+        self.pic()
+
+        # Wait for UDP packet signifying photo has been saved
+        server_thread.join()
+
+        # TODO, grab the pic via FTP.
+
     def stop(self):
         """ Stopping is fairly simple...
         """
@@ -170,3 +207,4 @@ if __name__ == '__main__':
     controller.move(-100)
     time.sleep(0.2)
     controller.stop()
+    controller.get_pic()
