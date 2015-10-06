@@ -6,18 +6,31 @@ import struct
 import time
 
 
+DEFAULT_IP = '192.168.2.1'
+
+
 class SumoController(object):
     """ Parrot Jumping Sumo controller.
     """
-    def __init__(self, ip='192.168.2.1', init_port=44444, debug=False):
-        self._ip = ip
+    def __init__(self, ip=None, init_port=44444, intercept=False, debug=False):
+        """ Set up the instance.
+
+            'intercept' mode skips the INIT step to allow for sending commands
+            to running Jumping Sumo already under control.
+
+        """
+        self._ip = ip if ip else DEFAULT_IP
         self._sequence = 1
         self._debug = debug
 
-        self._c2d_port = self._get_c2dport(init_port)
+        if intercept:
+            # Naive assumption about in-use port
+            self._c2d_port = 54321
+        else:
+            self._c2d_port = self._get_c2dport(init_port)
         self._c2d_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    def _get_c2dport(self, init_port, d2c_port=54321):
+    def _get_c2dport(self, init_port=44444, d2c_port=54321):
         """ Return the ports we need to connect to for control.
         """
         init_msg = {
