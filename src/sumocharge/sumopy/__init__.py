@@ -23,7 +23,7 @@ class SumoController(object):
     """ Parrot Jumping Sumo controller.
     """
     def __init__(self, sumo_ip='192.168.2.1', init_port=44444, d2c_port=54321,
-                 debug=False):
+                 start_video_stream=True, debug=False):
         """ Set up the instance.
         """
         self._sumo_ip = sumo_ip
@@ -58,6 +58,10 @@ class SumoController(object):
             args=(self._commands,)
         ).start()
 
+        # Do setup commands
+        if start_video_stream:
+            self.start_video_stream()
+
     def _do_init(self, init_port=44444):
         """ Do the init handshake, return the c2d_port.
         """
@@ -70,7 +74,7 @@ class SumoController(object):
         init_sock.connect((self._sumo_ip, init_port))
         init_sock.sendall(json.dumps(init_msg))
 
-        # Grab the JSON respone, strip trailing \x00 to keep it valid.
+        # Grab the JSON response, strip trailing \x00 to keep it valid.
         init_resp = init_sock.recv(1024)[:-1]
         json_init_resp = json.loads(init_resp)
 
@@ -202,6 +206,22 @@ class SumoController(object):
             struct.pack(
                 '<B',  # u8
                 0,  # Internal storage = 0
+            )
+        )
+        self._commands.append(cmd)
+
+    def start_video_stream(self):
+        """ Start the video streaming.
+        """
+        cmd = SumoController.fab_cmd(
+            4,  # ACK
+            11,  # Media channel ?
+            3,  # Jumping Sumo project id = 3
+            18,  # class = MediaStreaming
+            0,  # Command = VideoEnable (Offset = 0)
+            struct.pack(
+                '<B',  # u8
+                1,  # Enable = 1
             )
         )
         self._commands.append(cmd)
