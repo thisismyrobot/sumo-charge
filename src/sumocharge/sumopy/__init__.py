@@ -28,6 +28,7 @@ class SumoController(object):
         """
         self._sumo_ip = sumo_ip
         self._d2c_port = d2c_port
+        self._latest_pic = collections.deque(maxlen=1)
 
         # Do the init handshake, gathering a c2d_port and the size of the
         # video packets.
@@ -39,10 +40,15 @@ class SumoController(object):
         # Create and start the threaded listen server. Video packets are
         # larger than the default UDPServer size so we set max_packet_size
         # appropriately.
+        instance = self
         class UDPHandler(SocketServer.BaseRequestHandler):
             """ Handler for incoming UDP data.
             """
             def handle(self):
+                data = self.request[0]
+                # Intercept pictures
+                if data.startswith('\x03\x7d'):
+                    instance._latest_pic.append(data[12:])
 
         self._d2c_server = SocketServer.UDPServer(('', d2c_port), UDPHandler)
         self._d2c_server.max_packet_size = vid_data_size
@@ -222,10 +228,16 @@ class SumoController(object):
         )
         self._commands.append(cmd)
 
-    def get_pic(self):
+    def get_pic(self, retries=20):
         """ Return the last pic from the video stream.
         """
-        pass
+        try:
+            return self._latest_pic.pop()
+        except IndexError:
+            # First one can take a minute
+            if retries > 0:
+                time.sleep(0.1)
+                return self.get_pic(retries - 1)
 
 
 if __name__ == '__main__':
@@ -234,4 +246,5 @@ if __name__ == '__main__':
     controller.move(50)
     controller.store_pic()
     controller.move(-50, duration=0.5)
-    controller.get_pic()
+    with open('output.jpg', 'wb') as f:
+        f.write(controller.get_pic())
