@@ -23,11 +23,10 @@ class SumoController(object):
     """ Parrot Jumping Sumo controller.
     """
     def __init__(self, sumo_ip='192.168.2.1', init_port=44444, d2c_port=54321,
-                 start_video_stream=True, debug=False):
+                 start_video_stream=True):
         """ Set up the instance.
         """
         self._sumo_ip = sumo_ip
-        self._debug = debug
         self._d2c_port = d2c_port
 
         # Do the init handshake, gathering a c2d_port and the size of the
@@ -44,7 +43,6 @@ class SumoController(object):
             """ Handler for incoming UDP data.
             """
             def handle(self):
-                print '< ' + hex_repr(self.request[0][:50])
 
         self._d2c_server = SocketServer.UDPServer(('', d2c_port), UDPHandler)
         self._d2c_server.max_packet_size = vid_data_size
@@ -99,8 +97,6 @@ class SumoController(object):
             sequences[cmd[1]] = (sequences[cmd[1]] + 1) % 256
 
             # Send it!
-            if self._debug:
-                print '>', hex_repr(cmd)
             self._c2d_sock.sendto(cmd, (self._sumo_ip, self._c2d_port))
 
             time.sleep(1.0 / MOTOR_HZ)
@@ -234,7 +230,7 @@ class SumoController(object):
 
 if __name__ == '__main__':
 
-    controller = SumoController(debug=True)
+    controller = SumoController()
     controller.move(50)
     controller.store_pic()
     controller.move(-50, duration=0.5)
