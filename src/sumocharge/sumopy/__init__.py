@@ -16,7 +16,7 @@ MOTOR_HZ = 40.0
 def hex_repr(data):
     """ Pretty-print binary data.
     """
-    return ''.join('\\x{:02x}'.format(ord(c)) for c in data)
+    return ''.join('\\x{:02x}'.format(ord(c)) for c in str(data))
 
 
 class SumoController(object):
@@ -27,7 +27,6 @@ class SumoController(object):
         """ Set up the instance.
         """
         self._sumo_ip = sumo_ip
-        self._sequence = 1
         self._debug = debug
         self._d2c_port = d2c_port
 
@@ -45,7 +44,7 @@ class SumoController(object):
             """ Handler for incoming UDP data.
             """
             def handle(self):
-                print hex_repr(self.request[0][:25])
+                print '< ' + hex_repr(self.request[0][:50])
 
         self._d2c_server = SocketServer.UDPServer(('', d2c_port), UDPHandler)
         self._d2c_server.max_packet_size = vid_data_size
@@ -53,10 +52,10 @@ class SumoController(object):
 
         # Create and start the 40Hz movement sender. This keeps the connection
         # "alive".
-        self._movement_commands = collections.deque()
+        self._commands = collections.deque()
         threading.Thread(
-            target=self._motor_thread,
-            args=(self._movement_commands,)
+            target=self._cmd_thread,
+            args=(self._commands,)
         ).start()
 
     def _do_init(self, init_port=44444):
@@ -81,29 +80,47 @@ class SumoController(object):
 
         return c2d_port, json_init_resp['arstream_fragment_size']
 
-    def _motor_thread(self, command_list):
-        """ Drive the motors - either from commands list or stop.
-
-            Commands are sent at 40Hz.
+    def _cmd_thread(self, command_list):
+        """ Send commands at 40Hz, if no command send stop.
         """
+        sequence = 0
         while True:
             try:
                 cmd = command_list.popleft()
             except IndexError:
                 cmd = self._move_cmd(0, 0)
-            self._send(cmd)
+
+            # Update the sequence value
+            cmd[2] = sequence
+            sequence = (sequence + 1) % 256
+
+            # Send it!
+            if self._debug:
+                print '>', hex_repr(cmd)
+            self._c2d_sock.sendto(cmd, (self._sumo_ip, self._c2d_port))
+
             time.sleep(1.0 / MOTOR_HZ)
 
-    def _send(self, cmd):
-        """ Send via the c2d_port.
+    def _move_cmd(self, speed, turn):
+        """ Create movement commands.
         """
-        if self._debug:
-            print '>', hex_repr(cmd)
-        self._c2d_sock.sendto(cmd, (self._sumo_ip, self._c2d_port))
-        self._sequence = (self._sequence + 1) % 256
+        cmd = SumoController.fab_cmd(
+            2,  # No ACK
+            10,  # Piloting channel?
+            3,  # Jumping Sumo project id = 3
+            0,  # Piloting = Class ID 0
+            0,  # Command index 0 = PCMD
+            struct.pack(
+                '<Bbb',  # u8, i8, i8
+                1,  # Touch screen = yes
+                speed,   # -100 -> 100 %
+                turn,    # -100 -> 100 = -360 -> 360 degrees
+            )
+        )
+        return cmd
 
     @staticmethod
-    def fab_cmd(ack, channel, seq, project, _class, cmd, args):
+    def fab_cmd(ack, channel, project, _class, cmd, args):
         """ Assemble the bytes for a command.
 
             Most values from:
@@ -111,9 +128,6 @@ class SumoController(object):
 
             class_id:
                 From "<class name="Common" id="[id]">" in Xml.
-
-            seq:
-                Incrementing command sequence number (0-255).
 
             idx:
                 Index (zero-based) of the command in the Xml.
@@ -129,8 +143,8 @@ class SumoController(object):
         # Channel - 10 is for sending commands. 11 for photo trigger?
         arr.append(channel)
 
-        # Sequence number - 0-255
-        arr.append(seq)
+        # Sequence number - we update this at send time
+        arr.append(0)
 
         # Message length - we update this at end.
         arr.append(0)
@@ -158,37 +172,23 @@ class SumoController(object):
         # update message length value
         arr[3] = len(arr)
 
-        return str(arr)
+        return arr
 
     def move(self, speed, turn=0, duration=1.0, block=True):
         """ Move in a manner, for a duration(seconds).
         """
         # Minimum duration is one 40th of a second.
         duration = max(1.0 / MOTOR_HZ, duration)
-        cmd = self._move_cmd(speed, turn)
-        repetitions = int(duration * MOTOR_HZ)
-        self._movement_commands.extend([cmd] * repetitions)
+
+        # Enqueue the movement commands
+        self._commands.extend(
+            [self._move_cmd(speed, turn)
+             for _
+             in xrange(int(duration * MOTOR_HZ))]
+        )
+
         if block:
             time.sleep(duration)
-
-    def _move_cmd(self, speed, turn):
-        """ Create movement commands.
-        """
-        cmd = SumoController.fab_cmd(
-            2,  # No ACK
-            10,  # Piloting channel?
-            self._sequence,
-            3,  # Jumping Sumo project id = 3
-            0,  # Piloting = Class ID 0
-            0,  # Command index 0 = PCMD
-            struct.pack(
-                '<Bbb',  # u8, i8, i8
-                1,  # Touch screen = yes
-                speed,   # -100 -> 100 %
-                turn,    # -100 -> 100 = -360 -> 360 degrees
-            )
-        )
-        return cmd
 
     def store_pic(self):
         """ Take a pic to internal storage - use FTP to retrieve if you want.
@@ -196,7 +196,6 @@ class SumoController(object):
         cmd = SumoController.fab_cmd(
             4,  # ACK
             11,  # Media channel ?
-            self._sequence,
             3,  # Jumping Sumo project id = 3
             6,  # class = MediaRecord
             0,  # Command = Picture (offset 0)
@@ -205,7 +204,7 @@ class SumoController(object):
                 0,  # Internal storage = 0
             )
         )
-        self._send(cmd)
+        self._commands.append(cmd)
 
     def get_pic(self):
         """ Return the last pic from the video stream.
@@ -216,7 +215,7 @@ class SumoController(object):
 if __name__ == '__main__':
 
     controller = SumoController(debug=True)
-    controller.move(100)
+    controller.move(50)
     controller.store_pic()
-    controller.move(-100)
+    controller.move(-50, duration=0.5)
     controller.get_pic()
