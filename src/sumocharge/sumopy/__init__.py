@@ -87,16 +87,16 @@ class SumoController(object):
     def _cmd_thread(self, command_list):
         """ Send commands at 40Hz, if no command send stop.
         """
-        sequence = 0
+        sequences = collections.defaultdict(int)
         while True:
             try:
                 cmd = command_list.popleft()
             except IndexError:
                 cmd = self._move_cmd(0, 0)
 
-            # Update the sequence value
-            cmd[2] = sequence
-            sequence = (sequence + 1) % 256
+            # Update the sequence value - there is a sequence per channel.
+            cmd[2] = sequences[cmd[1]]
+            sequences[cmd[1]] = (sequences[cmd[1]] + 1) % 256
 
             # Send it!
             if self._debug:
