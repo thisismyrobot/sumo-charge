@@ -1,5 +1,6 @@
 """ Bare-bones Parrot Jumping Sumo control.
 """
+import collections
 import json
 import socket
 import struct
@@ -7,53 +8,98 @@ import threading
 import time
 import SocketServer
 
-DEFAULT_IP = '192.168.2.1'
+
+# Motor commands must be at 40 Hz for video to work.
+MOTOR_HZ = 40.0
+
+
+def hex_repr(data):
+    """ Pretty-print binary data.
+    """
+    return ''.join('\\x{:02x}'.format(ord(c)) for c in data)
 
 
 class SumoController(object):
     """ Parrot Jumping Sumo controller.
     """
-    def __init__(self, ip=None, init_port=44444, intercept=False, debug=False):
+    def __init__(self, sumo_ip='192.168.2.1', init_port=44444, d2c_port=54321,
+                 debug=False):
         """ Set up the instance.
-
-            'intercept' mode skips the INIT step to allow for sending commands
-            to running Jumping Sumo already under control.
-
         """
-        self._ip = ip if ip else DEFAULT_IP
+        self._sumo_ip = sumo_ip
         self._sequence = 1
         self._debug = debug
+        self._d2c_port = d2c_port
 
-        if intercept:
-            # Naive assumption about in-use port
-            self._c2d_port = 54321
-        else:
-            self._c2d_port = self._get_c2dport(init_port)
+        # Do the init handshake, gathering a c2d_port and the size of the
+        # video packets.
+        self._c2d_port, vid_data_size = self._do_init(init_port)
+
+        # Create the socket that we'll send data to the sumo via
         self._c2d_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    def _get_c2dport(self, init_port=44444, d2c_port=54321):
-        """ Return the ports we need to connect to for control.
+        # Create and start the threaded listen server. Video packets are
+        # larger than the default UDPServer size so we set max_packet_size
+        # appropriately.
+        class UDPHandler(SocketServer.BaseRequestHandler):
+            """ Handler for incoming UDP data.
+            """
+            def handle(self):
+                print hex_repr(self.request[0][:25])
+
+        self._d2c_server = SocketServer.UDPServer(('', d2c_port), UDPHandler)
+        self._d2c_server.max_packet_size = vid_data_size
+        threading.Thread(target=self._d2c_server.serve_forever).start()
+
+        # Create and start the 40Hz movement sender. This keeps the connection
+        # "alive".
+        self._movement_commands = collections.deque()
+        threading.Thread(
+            target=self._motor_thread,
+            args=(self._movement_commands,)
+        ).start()
+
+    def _do_init(self, init_port=44444):
+        """ Do the init handshake, return the c2d_port.
         """
         init_msg = {
             'controller_name': 'SumoPy',
             'controller_type': 'Python',
-            'd2c_port': d2c_port,
+            'd2c_port': self._d2c_port,
         }
         init_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        init_sock.connect((self._ip, init_port))
+        init_sock.connect((self._sumo_ip, init_port))
         init_sock.sendall(json.dumps(init_msg))
 
-        # Strip trailing \x00.
+        # Grab the JSON respone, strip trailing \x00 to keep it valid.
         init_resp = init_sock.recv(1024)[:-1]
+        json_init_resp = json.loads(init_resp)
 
-        return json.loads(init_resp)['c2d_port']
+        c2d_port = json_init_resp['c2d_port']
+        if c2d_port == 0:
+            raise Exception('Client already connected!')
+
+        return c2d_port, json_init_resp['arstream_fragment_size']
+
+    def _motor_thread(self, command_list):
+        """ Drive the motors - either from commands list or stop.
+
+            Commands are sent at 40Hz.
+        """
+        while True:
+            try:
+                cmd = command_list.popleft()
+            except IndexError:
+                cmd = self._move_cmd(0, 0)
+            self._send(cmd)
+            time.sleep(1.0 / MOTOR_HZ)
 
     def _send(self, cmd):
         """ Send via the c2d_port.
         """
         if self._debug:
-            print '>', SumoController.hex_repr(cmd)
-        self._c2d_sock.sendto(cmd, (self._ip, self._c2d_port))
+            print '>', hex_repr(cmd)
+        self._c2d_sock.sendto(cmd, (self._sumo_ip, self._c2d_port))
         self._sequence = (self._sequence + 1) % 256
 
     @staticmethod
@@ -114,12 +160,19 @@ class SumoController(object):
 
         return str(arr)
 
-    @staticmethod
-    def hex_repr(prstr):
-        return ''.join('\\x{:02x}'.format(ord(c)) for c in prstr)
+    def move(self, speed, turn=0, duration=1.0, block=True):
+        """ Move in a manner, for a duration(seconds).
+        """
+        # Minimum duration is one 40th of a second.
+        duration = max(1.0 / MOTOR_HZ, duration)
+        cmd = self._move_cmd(speed, turn)
+        repetitions = int(duration * MOTOR_HZ)
+        self._movement_commands.extend([cmd] * repetitions)
+        if block:
+            time.sleep(duration)
 
-    def move(self, speed, turn=0):
-        """ Move.
+    def _move_cmd(self, speed, turn):
+        """ Create movement commands.
         """
         cmd = SumoController.fab_cmd(
             2,  # No ACK
@@ -135,9 +188,9 @@ class SumoController(object):
                 turn,    # -100 -> 100 = -360 -> 360 degrees
             )
         )
-        self._send(cmd)
+        return cmd
 
-    def pic(self):
+    def store_pic(self):
         """ Take a pic to internal storage - use FTP to retrieve if you want.
         """
         cmd = SumoController.fab_cmd(
@@ -155,56 +208,15 @@ class SumoController(object):
         self._send(cmd)
 
     def get_pic(self):
-        """ Take a pic to internal storage and return it.
-
-            This isn't very quick (~2 seconds/pic), but it is reliable.
+        """ Return the last pic from the video stream.
         """
-        # Create a UDP handler
-        expected_sequence = int(self._sequence)
-        server = None
-        class UDPHandler(SocketServer.BaseRequestHandler):
-            """ SocketServer handler for data to controller from bot.
-            """
-            def handle(self):
-                def tidy():
-                    """ Threadable server shutdown.
-                    """
-                    server.shutdown()
-                    server.server_close()
-                data = self.request[0]
-
-                # Wait on the acknowledgement of the photo
-                if data.startswith('\x02\x00{}'.format(chr(expected_sequence))):
-                    threading.Thread(target=tidy).start()
-
-        # Create a listening UDP socket.
-        server = SocketServer.UDPServer(('', 54321), UDPHandler)
-        server_thread = threading.Thread(target=server.serve_forever)
-        server_thread.start()
-
-        # Ask for a photo
-        self.pic()
-
-        # Wait for UDP packet signifying photo has been saved
-        server_thread.join()
-
-        # TODO, grab the pic via FTP.
-
-    def stop(self):
-        """ Stopping is fairly simple...
-        """
-        self.move(0, 0)
+        pass
 
 
 if __name__ == '__main__':
 
     controller = SumoController(debug=True)
     controller.move(100)
-    time.sleep(0.2)
-    controller.stop()
-    controller.pic()
-    time.sleep(0.2)
+    controller.store_pic()
     controller.move(-100)
-    time.sleep(0.2)
-    controller.stop()
     controller.get_pic()
