@@ -1,1 +1,0 @@
-All other files in this folder are from [this revision of "rfid" by Jeremy Grosser](https://github.com/JeremyGrosser/rfid/tree/b55610e3c55dabfb234590c4fd43fcee030d1057).
