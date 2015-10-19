@@ -3,6 +3,17 @@
 An attempt to do wireless charging of a Parrot Jumping Sumo using a Raspberry
 Pi and some bits and bobs. This will hopefully allow for hands-free docking.
 
+## Installation
+
+    pip install -r requirements.txt
+    sudo apt-get install python-qrtools
+
+## Usage
+
+Eventually...:
+
+    python sumocharge/run.py
+
 ## Hardware
 
 ### Currently
@@ -22,16 +33,6 @@ Pi and some bits and bobs. This will hopefully allow for hands-free docking.
 ## Software
 
  * Raspbian on the Pi
-
- * Python deps:
-
-    pip install -r requirements.txt
-
- * Python QR tools:
-
-    sudo apt-get install python-qrtools
-
- * TBD...
 
 ## Hat tips
 
