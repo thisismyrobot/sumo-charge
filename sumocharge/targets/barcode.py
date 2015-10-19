@@ -54,14 +54,11 @@ def xy(zbar_loc, width, height):
 
 
 def get_width(zbar_loc):
-    """ Returns width of QR code. Non-QR codes return zero.
+    """ Returns width of QR code.
     """
-    try:
-        left_side  = (zbar_loc[0][0] + zbar_loc[1][0]) / 2
-        right_side = (zbar_loc[2][0] + zbar_loc[3][0]) / 2
-        return right_side - left_side
-    except IndexError:
-        return 0
+    left_side  = (zbar_loc[0][0] + zbar_loc[1][0]) / 2
+    right_side = (zbar_loc[2][0] + zbar_loc[3][0]) / 2
+    return right_side - left_side
 
 
 def locate(image):
