@@ -20,7 +20,7 @@ def codes(image_data):
     scanner.parse_config('enable')
     pil = PIL.Image.open(StringIO.StringIO(image_data)).convert('L')
     width, height = pil.size
-    raw = pil.tostring()
+    raw = pil.tobytes()
 
     image = zbar.Image(width, height, 'Y800', raw)
 
@@ -53,15 +53,25 @@ def xy(zbar_loc, width, height):
     return x_percent, y_percent
 
 
-def width(zbar_loc):
-    """ Returns width of QR code.
+def get_width(zbar_loc):
+    """ Returns width of QR code. Non-QR codes return zero.
     """
-    left_side  = (zbar_loc[0][0] + zbar_loc[1][0]) / 2
-    right_side = (zbar_loc[2][0] + zbar_loc[3][0]) / 2
-    return right_side - left_side
+    try:
+        left_side  = (zbar_loc[0][0] + zbar_loc[1][0]) / 2
+        right_side = (zbar_loc[2][0] + zbar_loc[3][0]) / 2
+        return right_side - left_side
+    except IndexError:
+        return 0
 
+
+def locate(image):
+    """ Returns code, x, y and width of detected targets in image.
+    """
+    return [(code, xy(location, *size), get_width(location))
+            for (code, size, location)
+            in codes(image)]
 
 if __name__ == '__main__':
     with open(sys.argv[-1], 'rb') as imgf:
-        for (code, size, location) in codes(imgf.read()):
-            print xy(location, *size), width(location)
+        for result in locate(imgf.read()):
+            print result
