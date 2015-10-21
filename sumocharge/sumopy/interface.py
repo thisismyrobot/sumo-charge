@@ -19,11 +19,19 @@ def hex_repr(data):
     return ''.join('\\x{:02x}'.format(ord(c)) for c in str(data))
 
 
+class SumoPyException(Exception):
+    pass
+
+
+class InitTimeoutException(SumoPyException):
+    pass
+
+
 class SumoController(object):
     """ Parrot Jumping Sumo controller.
     """
     def __init__(self, sumo_ip='192.168.2.1', init_port=44444, d2c_port=54321,
-                 start_video_stream=True):
+                 start_video_stream=True, sock_timeout=2):
         """ Set up the instance.
         """
         self._sumo_ip = sumo_ip
@@ -32,7 +40,7 @@ class SumoController(object):
 
         # Do the init handshake, gathering a c2d_port and the size of the
         # video packets.
-        self._c2d_port, vid_data_size = self._do_init(init_port)
+        self._c2d_port, vid_data_size = self._do_init(init_port, sock_timeout)
 
         # Create the socket that we'll send data to the sumo via
         self._c2d_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -41,6 +49,7 @@ class SumoController(object):
         # larger than the default UDPServer size so we set max_packet_size
         # appropriately.
         instance = self
+
         class UDPHandler(SocketServer.BaseRequestHandler):
             """ Handler for incoming UDP data.
             """
@@ -66,7 +75,7 @@ class SumoController(object):
         if start_video_stream:
             self.start_video_stream()
 
-    def _do_init(self, init_port=44444):
+    def _do_init(self, init_port=44444, sock_timeout=2):
         """ Do the init handshake, return the c2d_port.
         """
         init_msg = {
@@ -75,7 +84,13 @@ class SumoController(object):
             'd2c_port': self._d2c_port,
         }
         init_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        init_sock.connect((self._sumo_ip, init_port))
+        init_sock.settimeout(sock_timeout)
+        try:
+            init_sock.connect((self._sumo_ip, init_port))
+        except socket.timeout:
+            raise InitTimeoutException(
+                'Failed to perform init with Sumo - could not connect'
+            )
         init_sock.sendall(json.dumps(init_msg))
 
         # Grab the JSON response, strip trailing \x00 to keep it valid.
