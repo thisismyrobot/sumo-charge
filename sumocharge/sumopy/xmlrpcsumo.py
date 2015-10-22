@@ -68,7 +68,7 @@ def main(uhoh_event):
     uhoh_event.set()
 
 
-if __name__ == '__main__':
+def start():
     while True:
         uhoh_event = multiprocessing.Event()
         proc = multiprocessing.Process(target=main, args=(uhoh_event,))
@@ -77,3 +77,7 @@ if __name__ == '__main__':
         proc.terminate()
         print 'Restarting...'
         time.sleep(5)
+
+
+if __name__ == '__main__':
+    start()

@@ -1,8 +1,11 @@
 """ Flask-based control console.
 """
 import flask
-import sumopy
+import socket
+import xmlrpclib
 
+
+socket.setdefaulttimeout(0.1)
 
 app = flask.Flask(__name__)
 
@@ -14,11 +17,14 @@ def index():
     return flask.render_template('index.html')
 
 
-def gen(controller):
+def gen(sumoclient):
     """ Generator to return images.
     """
     while True:
-        frame = controller.get_pic()
+        frame = sumoclient.pic()
+        if frame is None:
+            continue
+        frame = frame.data
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
@@ -30,8 +36,8 @@ def drone_live():
         http://blog.miguelgrinberg.com/post/video-streaming-with-flask
     """
     return flask.Response(
-            gen(sumopy.SumoController()),
-            mimetype='multipart/x-mixed-replace; boundary=frame'
+        gen(xmlrpclib.ServerProxy('http://127.0.0.1:8000')),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
     )
 
 

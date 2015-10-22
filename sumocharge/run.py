@@ -1,69 +1,29 @@
-""" Charge-starting code for Parrot Jumping Sumo.
+""" Robot docking management system.
 """
-import pifacedigitalio
-import sumocharge.mifare
-import threading
-import time
-import sumocharge.usb_serial
+import multiprocessing
 
 
-# Will look at looping back the digital outs to some "ins" to detect this...
-CHARGING = False
-
-
-def start_charging(chip):
-    """ Enable the charging relays.
+def p_sumo_interface():
+    """ Fire up the xmlrpc interface to the sumo.
     """
-    global CHARGING
-    CHARGING = True
-    chip.output_pins[0].turn_on()
-    chip.output_pins[1].turn_on()
+    import sumopy.xmlrpcsumo
+    sumopy.xmlrpcsumo.start()
 
 
-def stop_charging(chip):
-    """ Disable the charging relays.
+def p_www():
+    """ Fire up the web viewer/controller.
     """
-    global CHARGING
-    CHARGING = False
-    chip.output_pins[0].turn_off()
-    chip.output_pins[1].turn_off()
+    import www
+    www.app.run(host='0.0.0.0')
 
 
-def switch_pressed(event):
-    """ Handler for when button 1 is pressed.
+def main():
+    """ Run all the things.
     """
-    global CHARGING
-    if not CHARGING:
-        start_charging(event.chip)
-    else:
-        stop_charging(event.chip)
+    multiprocessing.Process(target=p_sumo_interface).start()
+
+    multiprocessing.Process(target=p_www).start()
 
 
 if __name__ == '__main__':
-
-    # Set up the piface
-    pifacedigital = pifacedigitalio.PiFaceDigital()
-
-    # We need a usb serial port - the one with RFID connected would be great.
-    io = sumocharge.usb_serial.first()
-
-    # Set up the RFID reader loop
-    rfid = sumocharge.mifare.RFID(io)
-
-    def rfid_thread():
-        while True:
-            # If tag detected and we're not already charging, start charging
-            # in 5 seconds.
-            if rfid.serial() != [] and not CHARGING:
-                # Do a bit of flashing of pin 3
-                for i in range(40):
-                    pifacedigital.output_pins[2].toggle()
-                    time.sleep(0.125)
-                start_charging(pifacedigital)
-            time.sleep(1)
-    threading.Thread(target=rfid_thread).start()
-
-    # Configure the charging button and event handling
-    listener = pifacedigitalio.InputEventListener(chip=pifacedigital)
-    listener.register(0, pifacedigitalio.IODIR_ON, switch_pressed)
-    listener.activate()
+    main()
