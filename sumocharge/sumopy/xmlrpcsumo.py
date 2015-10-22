@@ -1,5 +1,6 @@
 import interface
 import sys
+import threading
 import time
 import xmlrpclib
 import SimpleXMLRPCServer
@@ -11,6 +12,17 @@ def start_server(funcs, host='127.0.0.1', port=8000):
         Pass {'name': func, ...} dict.
     """
     server = SimpleXMLRPCServer.SimpleXMLRPCServer((host, port), allow_none=True)
+
+    reload(xmlrpclib)
+
+    class ProxyFault(xmlrpclib.Fault):
+        """ We want to catch faults on the server too, to restart it.
+        """
+        def __init__(self, *args, **kwargs):
+            super(ProxyFault, self).__init__(*args, **kwargs)
+            threading.Thread(target=server.shutdown).start()
+    xmlrpclib.Fault = ProxyFault
+
     for (name, func) in funcs.items():
         server.register_function(func, name)
     server.serve_forever()
@@ -28,7 +40,10 @@ def proxy_pic(sumo):
     """ Calls the 'get_pic' function and returns a Binary result.
     """
     def get_pic_binary():
-        return xmlrpclib.Binary(sumo.get_pic())
+        pic = sumo.get_pic(retries=0)
+        if pic is None:
+            raise Exception('No connection? (couldn\'t get pic)')
+        return xmlrpclib.Binary(pic)
     return get_pic_binary
 
 
@@ -45,12 +60,13 @@ def main():
             print 'Creating Sumo...'
             sumo = interface.SumoController()
 
-            # Blocking
+            # Blocking - exceptions will stop though.
             print 'Starting server...'
             start_server({
                 'move': proxy_move(sumo),
                 'pic': proxy_pic(sumo),
             })
+            raise Exception('SimpleXMLRPCServer detected client error')
 
         except interface.SumoPyException as spe:
 
