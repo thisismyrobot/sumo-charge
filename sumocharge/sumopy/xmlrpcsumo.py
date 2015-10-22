@@ -1,28 +1,18 @@
 import interface
-import sys
+import multiprocessing
 import threading
 import time
 import xmlrpclib
 import SimpleXMLRPCServer
 
 
-def start_server(funcs, host='127.0.0.1', port=8000):
+def start_server(funcs, host='', port=8000):
     """ XMLRPC server.
 
         Pass {'name': func, ...} dict.
     """
     server = SimpleXMLRPCServer.SimpleXMLRPCServer((host, port), allow_none=True)
-
-    reload(xmlrpclib)
-
-    class ProxyFault(xmlrpclib.Fault):
-        """ We want to catch faults on the server too, to restart it.
-        """
-        def __init__(self, *args, **kwargs):
-            super(ProxyFault, self).__init__(*args, **kwargs)
-            threading.Thread(target=server.shutdown).start()
-    xmlrpclib.Fault = ProxyFault
-
+    server.logRequests = False
     for (name, func) in funcs.items():
         server.register_function(func, name)
     server.serve_forever()
@@ -38,50 +28,52 @@ def proxy_move(sumo):
 
 def proxy_pic(sumo):
     """ Calls the 'get_pic' function and returns a Binary result.
+
+        Returns None if no pic.
     """
     def get_pic_binary():
         pic = sumo.get_pic(retries=0)
-        if pic is None:
-            raise Exception('No connection? (couldn\'t get pic)')
-        return xmlrpclib.Binary(pic)
+        return pic if pic is None else xmlrpclib.Binary(pic)
     return get_pic_binary
 
 
-def main():
+def main(uhoh_event):
     """ XMLRPC server for sumopy.
 
         Allows multiple clients to manage a single Sumo.
-
-        Attempts to be resilient...
     """
-    while True:
-        try:
+    try:
+        # None-blocking, but starts some threads.
+        sumo = interface.SumoController()
 
-            print 'Creating Sumo...'
-            sumo = interface.SumoController()
+        # If the sumo looses connection, we try to reconnect.
+        def connected_watchdog():
+            while True:
+                time.sleep(0.5)
+                if not sumo.connected:
+                    uhoh_event.set()
+                    break
+        threading.Thread(target=connected_watchdog).start()
 
-            # Blocking - exceptions will stop though.
-            print 'Starting server...'
-            start_server({
-                'move': proxy_move(sumo),
-                'pic': proxy_pic(sumo),
-            })
-            raise Exception('SimpleXMLRPCServer detected client error')
+        # Blocking - exceptions will stop though.
+        start_server({
+            'move': proxy_move(sumo),
+            'pic': proxy_pic(sumo),
+        })
 
-        except interface.SumoPyException as spe:
+    except Exception:
+        uhoh_event.set()
 
-            sys.stderr.write(
-                'SumoPyException: {}\n'.format(spe)
-            )
-
-        except Exception as e:
-
-            sys.stderr.write(
-                'Exception: {}\n'.format(e)
-            )
-
-        time.sleep(5)
+    # If the server is un-blocked, and we're here, err, it broke.
+    uhoh_event.set()
 
 
 if __name__ == '__main__':
-    main()
+    while True:
+        uhoh_event = multiprocessing.Event()
+        proc = multiprocessing.Process(target=main, args=(uhoh_event,))
+        proc.start()
+        uhoh_event.wait()
+        proc.terminate()
+        print 'Restarting...'
+        time.sleep(5)

@@ -1,6 +1,7 @@
 """ Bare-bones Parrot Jumping Sumo control.
 """
 import collections
+import datetime
 import json
 import socket
 import struct
@@ -37,6 +38,7 @@ class SumoController(object):
         self._sumo_ip = sumo_ip
         self._d2c_port = d2c_port
         self._latest_pic = collections.deque(maxlen=1)
+        self._latest_rx = datetime.datetime.now()
 
         # Do the init handshake, gathering a c2d_port and the size of the
         # video packets.
@@ -54,12 +56,16 @@ class SumoController(object):
             """ Handler for incoming UDP data.
             """
             def handle(self):
+                instance._latest_rx = datetime.datetime.now()
                 data = self.request[0]
                 # Intercept pictures
                 if data.startswith('\x03\x7d'):
                     instance._latest_pic.append(data[12:])
 
-        self._d2c_server = SocketServer.UDPServer(('', d2c_port), UDPHandler)
+        class UDPServer(SocketServer.UDPServer):
+            allow_reuse_address = True
+
+        self._d2c_server = UDPServer(('', d2c_port), UDPHandler)
         self._d2c_server.max_packet_size = vid_data_size
         threading.Thread(target=self._d2c_server.serve_forever).start()
 
@@ -139,6 +145,10 @@ class SumoController(object):
             )
         )
         return cmd
+
+    @property
+    def connected(self):
+        return datetime.datetime.now() - self._latest_rx < datetime.timedelta(seconds=0.5)
 
     @staticmethod
     def fab_cmd(ack, channel, project, _class, cmd, args):

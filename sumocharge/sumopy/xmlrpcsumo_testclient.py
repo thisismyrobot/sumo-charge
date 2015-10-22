@@ -1,10 +1,13 @@
 """ Simple test client of the XMLRPC server.
 """
+import socket
 import xmlrpclib
 
-server = xmlrpclib.ServerProxy('http://127.0.0.1:8000')
+socket.setdefaulttimeout(0.1)
 
-server.move(20, 0, 0.2)
+client = xmlrpclib.ServerProxy('http://127.0.0.1:8000')
+
+client.move(20, 0, 0.2)
 
 with open('xmlrpcsumo_testclient.jpg', 'wb') as f:
-    f.write(server.pic().data)
+    f.write(client.pic().data)
