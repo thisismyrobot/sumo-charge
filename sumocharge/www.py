@@ -1,4 +1,8 @@
 """ Flask-based control console.
+
+    Testing:
+        ../venv/bin/gunicorn -w 4 --worker-class socketio.sgunicorn.GeventSocketIOWorker -b 0.0.0.0:5000 www:app
+
 """
 # Generic imports
 import base64
