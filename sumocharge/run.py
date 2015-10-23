@@ -14,7 +14,7 @@ def p_www():
     """ Fire up the web viewer/controller.
     """
     import www
-    www.app.run(host='0.0.0.0')
+    www.launch()
 
 
 def main():

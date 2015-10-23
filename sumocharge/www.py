@@ -1,15 +1,38 @@
 """ Flask-based control console.
 """
+# Generic imports
+import base64
 import flask
-import socket
 import xmlrpclib
 
-
-socket.setdefaulttimeout(0.1)
-
+# Create the flask app
 app = flask.Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'  # TODO: change...
+
+# Create the socketio wrapper
+import flask.ext.socketio
+socketio = flask.ext.socketio.SocketIO(app)
+
+# Create the sumo client
+sumoclient = xmlrpclib.ServerProxy('http://127.0.0.1:8000')
 
 
+## Websocket endpoints
+@socketio.on('request_frame', namespace='/video')
+def request_frame():
+    frame = None
+    try:
+        frame = sumoclient.pic()
+    except Exception:
+        return
+    if frame is None:
+        return
+    flask.ext.socketio.emit('frame', {
+        'data': base64.b64encode(frame.data),
+    })
+
+
+## URL endpoints
 @app.route('/')
 def index():
     """ Main page.
@@ -17,30 +40,9 @@ def index():
     return flask.render_template('index.html')
 
 
-def gen(sumoclient):
-    """ Generator to return images.
-    """
-    while True:
-        frame = sumoclient.pic()
-        if frame is None:
-            continue
-        frame = frame.data
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-
-@app.route('/drone_live')
-def drone_live():
-    """ MJPEG server.
-
-        http://blog.miguelgrinberg.com/post/video-streaming-with-flask
-    """
-    return flask.Response(
-        gen(xmlrpclib.ServerProxy('http://127.0.0.1:8000')),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
-    )
+def launch():
+    socketio.run(app)
 
 
 if __name__ == '__main__':
-    app.debug = True
-    app.run(host='0.0.0.0')
+    launch()

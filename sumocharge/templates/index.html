@@ -1,9 +1,12 @@
 <html>
   <head>
-    <title>Video Streaming Demonstration</title>
+    <title>Sumo Docking Station</title>
+    <script type="text/javascript" src="{{ url_for('static', filename='jquery-2.1.4.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='socket.io-0.9.16.min.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='index.js') }}"></script>
   </head>
   <body>
     <h1>Video Streaming Demonstration</h1>
-    <img src="{{ url_for('drone_live') }}">
+    <img id="video" src="">
   </body>
 </html>
