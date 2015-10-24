@@ -5,14 +5,22 @@ Pi and some bits and bobs. This will hopefully allow for hands-free docking.
 
 ## Installation
 
-    pip install -r requirements.txt
+From within the cloned repository (assuming on Linux):
+
+    git submodule init
+    git submodule update
+
+    virtualenv venv
+    venv/bin/pip install -r requirements.txt
+    venv/bin/pip install -r sumocharge/sumoproxy/requirements.txt
+
     sudo apt-get install python-qrtools
 
 ## Usage
 
 Eventually...:
 
-    python sumocharge/run.py
+    venv/bin/python sumocharge/run.py
 
 ## Hardware
 
