@@ -7,7 +7,7 @@ Pi and some bits and bobs. This will hopefully allow for hands-free docking.
 
 ## Installation
 
-From within the cloned repository (assuming on Linux):
+From within the cloned repository (assuming on Rasbian):
 
     git submodule init
     git submodule update
