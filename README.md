@@ -3,6 +3,8 @@
 An attempt to do wireless charging of a Parrot Jumping Sumo using a Raspberry
 Pi and some bits and bobs. This will hopefully allow for hands-free docking.
 
+![System design](/img/system.png?raw=true)
+
 ## Installation
 
 From within the cloned repository (assuming on Linux):
