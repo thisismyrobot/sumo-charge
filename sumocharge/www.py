@@ -4,6 +4,7 @@
 import base64
 import collections
 import flask
+import socket
 import threading
 import SocketServer
 
@@ -20,6 +21,8 @@ socketio = flask.ext.socketio.SocketIO(app)
 # Thread/process-safe queue of images
 image_queue = collections.deque(maxlen=30)
 
+# UDP socket for sending stuff
+udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 ## URL endpoints
 @app.route('/')
@@ -30,7 +33,7 @@ def index():
 
 
 ## Websocket endpoints
-@socketio.on('request_frame', namespace='/video')
+@socketio.on('request_frame')
 def request_frame():
     try:
         flask.ext.socketio.emit('frame', {
@@ -38,6 +41,13 @@ def request_frame():
         })
     except IndexError:
         pass
+
+
+@socketio.on('control')
+def control(message):
+    """ Send messages on the the local controller.
+    """
+    udp_sock.sendto(message, ('127.0.0.1', 8001))
 
 
 ## General methods

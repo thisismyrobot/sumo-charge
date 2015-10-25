@@ -21,12 +21,22 @@ def p_www():
     www.launch()
 
 
+def p_controller():
+    """ Fire up the local controller.
+
+        Listens on 127.0.0.1:8001 for UDP packets.
+    """
+    import local_control
+    local_control.main()
+
+
 def main():
     """ Run all the things.
     """
     targets = (
         p_sumo_proxy,
         p_www,
+        p_controller,
     )
 
     # Create the procs

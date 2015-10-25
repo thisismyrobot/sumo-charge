@@ -4,7 +4,7 @@ $(document).ready(function(){
     var req_timer = setInterval(function(){}, 1000);
 
     var socket = io.connect(
-        '//' + document.domain + ':' + location.port + '/video'
+        '//' + document.domain + ':' + location.port
     );
 
     socket.on('connect', function() {
@@ -20,6 +20,13 @@ $(document).ready(function(){
         req_timer = setInterval(function() {
             socket.emit('request_frame');
         }, 1000 / fps);
+
+        $('#enable_controller').click(function() {
+            socket.emit('control', 'enable_controller')
+        });
+
     });
+
+
 
 });
