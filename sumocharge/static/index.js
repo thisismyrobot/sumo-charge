@@ -21,12 +21,15 @@ $(document).ready(function(){
             socket.emit('request_frame');
         }, 1000 / fps);
 
+        // Controls
         $('#enable_controller').click(function() {
-            socket.emit('control', 'enable_controller')
+            socket.emit('control', 'enable_controller');
+        });
+
+        $('#disable_controller').click(function() {
+            socket.emit('control', 'disable_controller');
         });
 
     });
-
-
 
 });

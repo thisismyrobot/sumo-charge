@@ -48,12 +48,11 @@ def main():
 
     while True:
         if state['enabled']:
-            print 'Local Client Enabled!'
             controller = sumopy.SumoController(
                 sumo_ip='127.0.0.1'
             )
 
-            while True:
+            while state['enabled']:
                 controller.move(10, 0, 0.1)
                 time.sleep(1)
 
