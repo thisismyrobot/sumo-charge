@@ -64,7 +64,7 @@ def start_video_thread(sockio_mod):
 
     # Patch to recieve video packets (+ direction indicator)
     SocketServer.UDPServer.max_packet_size = 65001
-    server = SocketServer.UDPServer(('127.0.0.1', 65432), Handler)
+    server = SocketServer.UDPServer(('127.0.0.1', 8002), Handler)
     t = threading.Thread(target=server.serve_forever)
     t.daemon = True
     t.start()

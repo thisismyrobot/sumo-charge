@@ -6,10 +6,14 @@ import time
 
 
 def p_sumo_proxy():
-    """ Fire up the proxy - this will spit UDP packets at 127.0.0.1:65432.
+    """ Fire up the proxy and set up the targets for packets.
     """
     import sumoproxy.proxy
-    sumoproxy.proxy.proc_wrapper()
+    sumoproxy.proxy.proc_wrapper(
+        repeaters=(
+            ('127.0.0.1', 8002),  # For FPV video to www module
+        )
+    )
 
 
 def p_www():
