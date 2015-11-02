@@ -47,3 +47,9 @@ Eventually...:
 ## Hat tips
 
  * Heaps of pointers toward the byte format for commands: https://github.com/haraisao/JumpingSumo-Python
+
+## For when I forget
+
+Updating the submodules to most recent commit:
+
+    git submodule foreach git pull origin master
